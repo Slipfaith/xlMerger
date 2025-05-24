@@ -3,14 +3,18 @@ import sys
 import json
 import traceback
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout,
+    QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
     QComboBox, QMessageBox, QProgressBar, QScrollArea, QFrame, QCheckBox, QListWidget,
-    QListWidgetItem, QRadioButton, QGridLayout, QStackedWidget
+    QListWidgetItem, QRadioButton, QGridLayout, QStackedWidget, QLineEdit, QPushButton,
+    QFileDialog
 )
+
 from PySide6.QtCore import Qt, Signal
+
 from gui.excel_previewer import ExcelPreviewer
 from gui.excel_file_selector import ExcelFileSelector
 from core.excel_processor import ExcelProcessor
+from core.drag_drop import DragDropLineEdit
 from utils.utils import excel_column_to_index
 
 class FileProcessorApp(QWidget):
@@ -62,30 +66,18 @@ class FileProcessorApp(QWidget):
 
     def create_folder_selection_layout(self):
         layout = QHBoxLayout()
-        self.folder_entry = QLineEdit(self)
-        self.folder_entry.setPlaceholderText(self.tr("Перетащите сюда папку"))
-        self.folder_entry.setAcceptDrops(True)
-        self.folder_entry.dragEnterEvent = self.dragEnterEvent
-        self.folder_entry.dropEvent = self.dropEvent
-        folder_button = QPushButton(self.tr("Обзор"), self)
-        folder_button.clicked.connect(self.select_folder)
-        layout.addWidget(QLabel(self.tr("Путь к папке с переводами:")))
+        self.folder_entry = DragDropLineEdit(mode='folder')
+        self.folder_entry.pathSelected.connect(self.on_folder_selected)
+        layout.addWidget(QLabel(self.tr("Папка переводов:")))
         layout.addWidget(self.folder_entry)
-        layout.addWidget(folder_button)
         return layout
 
     def create_excel_selection_layout(self):
         layout = QHBoxLayout()
-        self.excel_file_entry = QLineEdit(self)
-        self.excel_file_entry.setPlaceholderText(self.tr("Перетащите сюда xlsx или нажмите \"Обзор\""))
-        self.excel_file_entry.setAcceptDrops(True)
-        self.excel_file_entry.dragEnterEvent = self.dragEnterEventExcel
-        self.excel_file_entry.dropEvent = self.dropEventExcel
-        excel_button = QPushButton(self.tr("Обзор"), self)
-        excel_button.clicked.connect(self.select_excel_file)
-        layout.addWidget(QLabel(self.tr("Путь к файлу Excel:")))
+        self.excel_file_entry = DragDropLineEdit(mode='file')
+        self.excel_file_entry.pathSelected.connect(self.on_excel_file_selected)
+        layout.addWidget(QLabel(self.tr("Файл Excel:")))
         layout.addWidget(self.excel_file_entry)
-        layout.addWidget(excel_button)
         return layout
 
     def create_sheet_selection_layout(self):
@@ -109,14 +101,14 @@ class FileProcessorApp(QWidget):
         layout = QHBoxLayout()
         self.copy_column_entry = QLineEdit(self)
         self.copy_column_entry.setMaximumWidth(100)
-        copy_column_label = QLabel(self.tr("Столбец для копирования:"))
+        copy_column_label = QLabel(self.tr("Столбец копирования:"))
         copy_column_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(copy_column_label)
         layout.addWidget(self.copy_column_entry)
         return layout
 
     def create_skip_first_row_checkbox(self):
-        self.skip_first_row_checkbox = QCheckBox(self.tr("Первая строка - заголовок в переводах"), self)
+        self.skip_first_row_checkbox = QCheckBox(self.tr("Первая строка — заголовок в переводах"), self)
         self.skip_first_row_checkbox.stateChanged.connect(self.toggle_skip_first_row)
         return self.skip_first_row_checkbox
 
@@ -141,48 +133,15 @@ class FileProcessorApp(QWidget):
         process_button.clicked.connect(self.process_files)
         return process_button
 
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+    # ==== DragDropLineEdit callbacks ====
+    def on_folder_selected(self, path):
+        self.folder_path = path
 
-    def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        if urls and urls[0].isLocalFile():
-            file_paths = [url.toLocalFile() for url in urls if os.path.isfile(url.toLocalFile())]
-            if file_paths:
-                self.folder_path = os.path.dirname(file_paths[0])
-                self.folder_entry.setText(self.folder_path)
-                self.selected_files = [os.path.basename(fp) for fp in file_paths]
-            elif os.path.isdir(urls[0].toLocalFile()):
-                self.folder_path = urls[0].toLocalFile()
-                self.folder_entry.setText(self.folder_path)
-                self.selected_files = None
+    def on_excel_file_selected(self, path):
+        self.excel_file_path = path
+        self.load_sheet_names()
 
-    def dragEnterEventExcel(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-
-    def dropEventExcel(self, event):
-        urls = event.mimeData().urls()
-        if urls and urls[0].isLocalFile():
-            file_path = urls[0].toLocalFile()
-            if file_path.endswith(('.xlsx', '.xls')):
-                self.excel_file_entry.setText(file_path)
-                self.excel_file_path = file_path
-                self.load_sheet_names()
-
-    def select_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, self.tr("Выберите папку"))
-        if folder_path:
-            self.folder_entry.setText(folder_path)
-            self.folder_path = folder_path
-
-    def select_excel_file(self):
-        excel_file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Выберите файл Excel"), '', self.tr("Excel файлы (*.xlsx *.xls)"))
-        if excel_file_path:
-            self.excel_file_entry.setText(excel_file_path)
-            self.excel_file_path = excel_file_path
-            self.load_sheet_names()
+    # ==== Старая drag&drop больше не нужна ====
 
     def load_sheet_names(self):
         try:
@@ -218,7 +177,7 @@ class FileProcessorApp(QWidget):
 
     def select_excel_file_for_preview(self):
         if not self.folder_path:
-            QMessageBox.warning(self, self.tr("Предупреждение"), self.tr("Сначала выберите папку с переводами."))
+            QMessageBox.warning(self, self.tr("Предупреждение"), self.tr("Сначала выбери папку с переводами."))
             return
         dialog = ExcelFileSelector(self.folder_path, self.selected_files)
         if dialog.exec():
@@ -237,7 +196,7 @@ class FileProcessorApp(QWidget):
                                 for index in range(self.sheet_list.count())
                                 if self.sheet_list.item(index).checkState() == Qt.Checked]
         if not self.selected_sheets:
-            QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Выберите хотя бы один лист."))
+            QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Выбери хотя бы один лист."))
             return
         self.go_to_header_page()
 
@@ -249,16 +208,16 @@ class FileProcessorApp(QWidget):
             QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Указанный файл Excel не существует."))
             return False
         if not self.copy_column:
-            QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Укажите столбец для копирования."))
+            QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Укажи столбец для копирования."))
             return False
         return True
 
     # ============= Страница выбора строки заголовка =============
     def create_header_page(self):
         page = QWidget()
-        page.setWindowTitle(self.tr("Выберите строку заголовка"))
+        page.setWindowTitle(self.tr("Выбери строку заголовка"))
         layout = QVBoxLayout()
-        layout.addWidget(QLabel(self.tr("Выберите номер строки заголовка в файле Excel для каждого листа:")))
+        layout.addWidget(QLabel(self.tr("Выбери номер строки заголовка для каждого листа:")))
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_content = QFrame()
@@ -297,7 +256,6 @@ class FileProcessorApp(QWidget):
 
     def load_columns_and_go_to_sheet_column(self):
         try:
-            # Собираем строковые индексы
             self.header_row = {sheet: int(combo.currentText()) - 1 for sheet, combo in self.sheet_to_header_row.items()}
             self.columns = {}
             for sheet, header_row in self.header_row.items():
@@ -312,7 +270,7 @@ class FileProcessorApp(QWidget):
         page = QWidget()
         page.setWindowTitle(self.tr("Соответствие лист-столбец"))
         layout = QVBoxLayout()
-        layout.addWidget(QLabel(self.tr("Из какого столбца на каждом листе должны копироваться переводы?")))
+        layout.addWidget(QLabel(self.tr("Из какого столбца на каждом листе копировать?")))
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_content = QFrame()
@@ -351,7 +309,7 @@ class FileProcessorApp(QWidget):
         is_files = self.are_all_items_files(os.listdir(self.folder_path))
         page.setWindowTitle(self.tr("Соответствие файл-столбец" if is_files else "Соответствие папка-столбец"))
         layout = QVBoxLayout()
-        layout.addWidget(QLabel(self.tr("Сопоставьте имена файлов с именами столбцов:") if is_files else self.tr("Сопоставьте имена папок с именами столбцов:")))
+        layout.addWidget(QLabel(self.tr("Сопоставь имена файлов с колонками:") if is_files else self.tr("Сопоставь папки с колонками:")))
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_content = QFrame()
@@ -378,7 +336,7 @@ class FileProcessorApp(QWidget):
                 column_combobox.setMaximumWidth(100)
                 column_combobox.addItems(available_columns)
                 scroll_layout.addWidget(file_label, row, col)
-                scroll_layout.addWidget(column_combobox, row, col+1)
+                scroll_layout.addWidget(column_combobox, row, col + 1)
                 self.file_to_column[file_name] = column_combobox
                 row += 1
         else:
@@ -398,7 +356,7 @@ class FileProcessorApp(QWidget):
                     column_combobox.setMaximumWidth(100)
                     column_combobox.addItems(available_columns)
                     scroll_layout.addWidget(folder_label, row, col)
-                    scroll_layout.addWidget(column_combobox, row, col+1)
+                    scroll_layout.addWidget(column_combobox, row, col + 1)
                     self.folder_to_column[folder_name] = column_combobox
                     row += 1
         layout.addWidget(scroll_area)
@@ -432,7 +390,7 @@ class FileProcessorApp(QWidget):
         page = QWidget()
         page.setWindowTitle(self.tr("Подтверждение сопоставления"))
         layout = QVBoxLayout()
-        layout.addWidget(QLabel(self.tr("Подтвердите сопоставление:")))
+        layout.addWidget(QLabel(self.tr("Проверь сопоставление:")))
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_content = QFrame()
@@ -578,7 +536,6 @@ class FileProcessorApp(QWidget):
     def start_copying(self):
         try:
             self.go_to_progress_page()
-            # Формируем МАППИНГИ для передачи (только строки)
             file_to_column = {k: v.currentText() for k, v in self.file_to_column.items()} if self.file_to_column else {}
             folder_to_column = {k: v.currentText() for k, v in self.folder_to_column.items()} if self.folder_to_column else {}
             processor = ExcelProcessor(
