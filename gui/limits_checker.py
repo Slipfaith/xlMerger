@@ -1,17 +1,15 @@
-# limits_checker.py
-
-import os, sys
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import (
+import os
+import sys
+from PySide6 import QtWidgets, QtCore
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
     QPushButton, QFileDialog, QComboBox, QMessageBox, QStackedWidget, QTextEdit,
     QSplitter, QListWidget, QMenu
 )
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
-
 
 # Универсальная функция для приведения значения к целому числу
 def _get_int_value(value):
@@ -20,7 +18,6 @@ def _get_int_value(value):
         return int(s) if s != "" else None
     except Exception:
         return None
-
 
 # ==================== DragDropLineEdit ====================
 class DragDropLineEdit(QLineEdit):
@@ -40,10 +37,9 @@ class DragDropLineEdit(QLineEdit):
             self.setText(file_path)
             self.update_callback(file_path)
 
-
 # ==================== DraggableHeaderView ====================
 class DraggableHeaderView(QtWidgets.QHeaderView):
-    dragSelectionChanged = pyqtSignal(set)
+    dragSelectionChanged = Signal(set)
 
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -76,24 +72,17 @@ class DraggableHeaderView(QtWidgets.QHeaderView):
         self._dragging = False
         super().mouseReleaseEvent(event)
 
-
 # ==================== LimitsMappingPreviewDialog ====================
 class LimitsMappingPreviewDialog(QtWidgets.QDialog):
     def __init__(self, model: QStandardItemModel, headers: list, parent=None):
-        """
-        :param model: QStandardItemModel для превью (например, первые N строк Excel)
-        :param headers: Список заголовков столбцов
-        """
         super().__init__(parent)
         self.setWindowTitle("Интерактивное сопоставление лимитов")
         self.resize(800, 600)
         self.headers = headers
         self.model = model
-        self.manual = False  # Ручной режим выключен по умолчанию
+        self.manual = False
         self.current_limit = None
         self.current_texts = set()
-        # Для режима столбцов: (limit_header, [text_headers], False, None, None, "column")
-        # Для ручного режима: (selected_cells, True, upper, lower, "cell")
         self.mappings = []
         self.init_ui()
 
@@ -103,7 +92,7 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
         self.manual_checkbox.stateChanged.connect(self.toggle_manual_mode)
         main_layout.addWidget(self.manual_checkbox)
 
-        splitter = QtWidgets.QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Vertical)
         top_widget = QWidget()
         top_layout = QVBoxLayout(top_widget)
         instruction = QLabel(
@@ -124,7 +113,7 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
         self.current_mapping_label = QLabel("Текущая настройка: Не выбрано")
         top_layout.addWidget(self.current_mapping_label)
 
-        manual_group = QtWidgets.QGroupBox("Ручная настройка лимитов")
+        manual_group = QGroupBox("Ручная настройка лимитов")
         manual_layout = QHBoxLayout()
         self.upper_limit_edit = QLineEdit()
         self.upper_limit_edit.setPlaceholderText("Верхний лимит")
@@ -139,10 +128,10 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
         manual_group.setLayout(manual_layout)
         top_layout.addWidget(manual_group)
 
-        btn_layout = QtWidgets.QHBoxLayout()
-        self.save_mapping_btn = QtWidgets.QPushButton("Подтвердить")
+        btn_layout = QHBoxLayout()
+        self.save_mapping_btn = QPushButton("Подтвердить")
         self.save_mapping_btn.clicked.connect(self.save_current_mapping)
-        self.clear_selection_btn = QtWidgets.QPushButton("Очистить выбор")
+        self.clear_selection_btn = QPushButton("Очистить выбор")
         self.clear_selection_btn.clicked.connect(self.clear_selection)
         btn_layout.addWidget(self.save_mapping_btn)
         btn_layout.addWidget(self.clear_selection_btn)
@@ -150,8 +139,8 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
         splitter.addWidget(top_widget)
 
         bottom_widget = QWidget()
-        bottom_layout = QtWidgets.QVBoxLayout(bottom_widget)
-        bottom_layout.addWidget(QtWidgets.QLabel("Сохранённые сопоставления:"))
+        bottom_layout = QVBoxLayout(bottom_widget)
+        bottom_layout.addWidget(QLabel("Сохранённые сопоставления:"))
         self.mapping_list = QListWidget()
         self.mapping_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.mapping_list.customContextMenuRequested.connect(self.show_mapping_context_menu)
@@ -163,10 +152,10 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
 
         main_layout.addWidget(splitter)
 
-        bottom_btn_layout = QtWidgets.QHBoxLayout()
-        self.done_btn = QtWidgets.QPushButton("Готово")
+        bottom_btn_layout = QHBoxLayout()
+        self.done_btn = QPushButton("Готово")
         self.done_btn.clicked.connect(self.accept)
-        self.cancel_btn = QtWidgets.QPushButton("Отмена")
+        self.cancel_btn = QPushButton("Отмена")
         self.cancel_btn.clicked.connect(self.reject)
         bottom_btn_layout.addWidget(self.done_btn)
         bottom_btn_layout.addWidget(self.cancel_btn)
@@ -336,14 +325,13 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
                 QMessageBox.critical(self, "Ошибка", "Выберите столбец с лимитом и хотя бы один столбец с текстом.")
                 return
             mapping = (
-            self.headers[self.current_limit], [self.headers[i] for i in sorted(self.current_texts)], False, None, None,
-            "column")
+                self.headers[self.current_limit], [self.headers[i] for i in sorted(self.current_texts)],
+                False, None, None, "column")
         else:
             indexes = self.table_view.selectionModel().selectedIndexes()
             if not indexes:
                 QMessageBox.critical(self, "Ошибка", "Выберите диапазон ячеек для проверки.")
                 return
-            # При сохранении в ручном режиме уже добавляем смещение строк
             cells = set((index.row() + 2, index.column()) for index in indexes)
             upper = _get_int_value(self.upper_limit_edit.text())
             lower = _get_int_value(self.lower_limit_edit.text())
@@ -365,7 +353,7 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
             menu = QMenu()
             delete_action = menu.addAction("Удалить")
             edit_action = menu.addAction("Редактировать")
-            action = menu.exec_(self.mapping_list.mapToGlobal(pos))
+            action = menu.exec(self.mapping_list.mapToGlobal(pos))
             row = self.mapping_list.row(item)
             if action == delete_action:
                 self.mapping_list.takeItem(row)
@@ -403,7 +391,6 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
             QMessageBox.critical(self, "Ошибка дублирования", "\n".join(duplicates))
             return
         super().accept()
-
 
 # ==================== Основной класс LimitsChecker ====================
 class LimitsChecker(QWidget):
@@ -485,7 +472,6 @@ class LimitsChecker(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при открытии файла: {e}")
             return
-        from PyQt5.QtGui import QStandardItemModel, QStandardItem
         model = QStandardItemModel()
         model.setHorizontalHeaderLabels(self.headers)
         row_count = 10
@@ -495,7 +481,7 @@ class LimitsChecker(QWidget):
                      for cell in row]
             model.appendRow(items)
         dialog = LimitsMappingPreviewDialog(model, self.headers, self)
-        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+        if dialog.exec() == QtWidgets.QDialog.Accepted:
             self.mappings = dialog.get_mappings()
 
     def goto_results_page(self):
@@ -569,7 +555,7 @@ class LimitsChecker(QWidget):
                 current_limit = _get_int_value(upper)
                 current_lower = _get_int_value(lower)
                 for (model_row, col) in selected_cells:
-                    sheet_row = model_row  # Используем номер строки как сохранённый
+                    sheet_row = model_row
                     cell_obj = self.sheet.cell(row=sheet_row, column=col + 1)
                     cell_text = cell_obj.value
                     if cell_text is None:
@@ -578,12 +564,10 @@ class LimitsChecker(QWidget):
                     text_length = len(text_str)
                     violation = False
                     detail = ""
-                    # Если превышает верхний лимит, окрашиваем в бледно-красный
                     if current_limit is not None and text_length > current_limit:
                         violation = True
                         detail += f"длина = {text_length} (лимит {current_limit})"
                         fill = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
-                    # Если меньше нижнего лимита, окрашиваем в бледно-оранжевый
                     elif current_lower is not None and text_length < current_lower:
                         violation = True
                         detail += f"длина = {text_length} (нижний лимит {current_lower})"
@@ -636,9 +620,8 @@ class LimitsChecker(QWidget):
     def go_back_to_file_page(self):
         self.stack.setCurrentWidget(self.file_page)
 
-
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = LimitsChecker()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

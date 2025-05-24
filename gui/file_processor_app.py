@@ -4,13 +4,13 @@ import json
 import traceback
 import hashlib
 import pandas as pd
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout,
     QTableView, QHeaderView, QComboBox, QMessageBox, QProgressBar, QScrollArea, QFrame, QCheckBox, QListWidget,
     QListWidgetItem, QRadioButton, QGridLayout, QDialog, QListView, QStackedWidget
 )
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QStandardItemModel, QStandardItem
 from openpyxl import load_workbook
 import openpyxl.utils as utils
 from openpyxl.styles import PatternFill
@@ -20,13 +20,11 @@ from gui.excel_file_selector import ExcelFileSelector
 from utils import excel_column_to_index
 
 class FileProcessorApp(QWidget):
-    # Сигнал оставляем, если понадобится
-    copyingStarted = pyqtSignal()
+    copyingStarted = Signal()
 
     def __init__(self):
         super().__init__()
 
-        # Инициализация переменных
         self.folder_path = ''
         self.excel_file_path = ''
         self.copy_column = ''
@@ -41,10 +39,7 @@ class FileProcessorApp(QWidget):
         self.copy_by_row_number = False
         self.workbook = None
 
-        # Создаем контейнер для «страниц»
         self.stack = QStackedWidget(self)
-
-        # Создаем первую страницу – основное окно настроек
         self.page_main = self.create_main_page()
         self.stack.addWidget(self.page_main)
 
@@ -57,24 +52,17 @@ class FileProcessorApp(QWidget):
         self.setGeometry(300, 300, 600, 400)
         self.show()
 
-    # ===================== Главная страница =====================
+    # ======= Главная страница =======
     def create_main_page(self):
         widget = QWidget()
         layout = QVBoxLayout()
 
-        # Выбор папки
         layout.addLayout(self.create_folder_selection_layout())
-        # Выбор Excel-файла
         layout.addLayout(self.create_excel_selection_layout())
-        # Выбор листов
         layout.addLayout(self.create_sheet_selection_layout())
-        # Ввод столбца для копирования
         layout.addLayout(self.create_copy_column_layout())
-        # Чекбокс "Первая строка – заголовок"
         layout.addWidget(self.create_skip_first_row_checkbox())
-        # Выбор способа копирования
         layout.addLayout(self.create_copy_method_selection_layout())
-        # Кнопки предпросмотра и начала обработки
         layout.addWidget(self.create_preview_button(), alignment=Qt.AlignRight)
         layout.addWidget(self.create_process_button(), alignment=Qt.AlignCenter)
 
@@ -174,7 +162,7 @@ class FileProcessorApp(QWidget):
         process_button.clicked.connect(self.process_files)
         return process_button
 
-    # Методы для Drag&Drop
+    # Drag&Drop
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
@@ -250,7 +238,6 @@ class FileProcessorApp(QWidget):
             item = self.sheet_list.item(index)
             item.setCheckState(state)
 
-    # Обработка нажатия кнопки "Начать"
     def process_files(self):
         self.folder_path = self.folder_entry.text()
         self.excel_file_path = self.excel_file_entry.text()
@@ -271,7 +258,6 @@ class FileProcessorApp(QWidget):
             self.workbook = load_workbook(self.excel_file_path)
             self.columns = {}
             self.header_row = {}
-            # Переходим на страницу выбора строки заголовка
             self.go_to_header_page()
         except Exception as e:
             self.log_error(e)
@@ -294,7 +280,7 @@ class FileProcessorApp(QWidget):
 
     def log_error(self, error):
         log_file_path = os.path.join(os.path.dirname(__file__), 'error_log.txt')
-        with open(log_file_path, 'a') as log_file:
+        with open(log_file_path, 'a', encoding='utf-8') as log_file:
             log_file.write(self.tr("Ошибка: ") + str(error) + "\n")
             log_file.write(traceback.format_exc())
             log_file.write("\n")
@@ -302,11 +288,12 @@ class FileProcessorApp(QWidget):
     def center_window(self, window=None):
         if window is None:
             window = self
-        frameGm = window.frameGeometry()
-        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
-        centerPoint = QApplication.desktop().screenGeometry(screen).center()
-        frameGm.moveCenter(centerPoint)
-        window.move(frameGm.topLeft())
+        screen = QApplication.primaryScreen()
+        if screen:
+            rect = screen.availableGeometry()
+            x = (rect.width() - self.width()) // 2
+            y = (rect.height() - self.height()) // 2
+            window.move(x, y)
 
     def toggle_skip_first_row(self, state):
         self.skip_first_row = state == Qt.Checked
@@ -323,13 +310,13 @@ class FileProcessorApp(QWidget):
             return
 
         dialog = ExcelFileSelector(self.folder_path, self.selected_files)
-        if dialog.exec_():
+        if dialog.exec():
             selected_file = dialog.selected_file
             if selected_file:
                 self.preview_window = ExcelPreviewer(selected_file)
                 self.preview_window.show()
 
-    # ===================== Страница выбора строки заголовка =====================
+    # ======= Страница выбора строки заголовка =======
     def create_header_page(self):
         page = QWidget()
         page.setWindowTitle(self.tr("Выберите строку заголовка"))
@@ -399,7 +386,7 @@ class FileProcessorApp(QWidget):
             self.log_error(e)
             QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Произошла ошибка при загрузке столбцов: ") + str(e))
 
-    # ===================== Страница соответствия лист-столбец =====================
+    # ======= Страница соответствия лист-столбец =======
     def create_sheet_column_page(self):
         page = QWidget()
         page.setWindowTitle(self.tr("Соответствие лист-столбец"))
@@ -447,10 +434,9 @@ class FileProcessorApp(QWidget):
         self.stack.addWidget(self.page_sheet_column)
         self.stack.setCurrentWidget(self.page_sheet_column)
 
-    # ===================== Страница сопоставления (файл/папка) =====================
+    # ======= Страница сопоставления (файл/папка) =======
     def create_match_page(self):
         page = QWidget()
-        # В зависимости от содержимого папки устанавливаем заголовок
         if self.are_all_items_files(os.listdir(self.folder_path)):
             page.setWindowTitle(self.tr("Соответствие файл-столбец"))
         else:
@@ -542,7 +528,7 @@ class FileProcessorApp(QWidget):
         self.stack.addWidget(self.page_match)
         self.stack.setCurrentWidget(self.page_match)
 
-    # ===================== Страница подтверждения сопоставления =====================
+    # ======= Страница подтверждения сопоставления =======
     def create_confirmation_page(self):
         page = QWidget()
         page.setWindowTitle(self.tr("Подтверждение сопоставления"))
@@ -593,7 +579,7 @@ class FileProcessorApp(QWidget):
         else:
             return sorted(self.folder_to_column.items(), key=lambda x: (x[1].currentText() == "", x[0]))
 
-    # ===================== Страница прогресса копирования =====================
+    # ======= Страница прогресса копирования =======
     def create_progress_page(self):
         page = QWidget()
         page.setWindowTitle(self.tr("Копирование переводов"))
@@ -616,7 +602,7 @@ class FileProcessorApp(QWidget):
         self.stack.addWidget(self.page_progress)
         self.stack.setCurrentWidget(self.page_progress)
 
-    # ===================== Страница завершения копирования =====================
+    # ======= Страница завершения копирования =======
     def create_completion_page(self):
         page = QWidget()
         page.setWindowTitle(self.tr("Копирование завершено"))
@@ -660,13 +646,13 @@ class FileProcessorApp(QWidget):
         self.folder_to_column = {}
         self.file_to_column = {}
 
-    # ===================== Сохранение/загрузка настроек сопоставления =====================
+    # ======= Сохранение/загрузка настроек сопоставления =======
     def save_mapping_settings(self):
         try:
             mapping = self.get_current_mapping()
             settings_path, _ = QFileDialog.getSaveFileName(self, self.tr("Сохранить настройки"), '', self.tr("JSON файлы (*.json)"))
             if settings_path:
-                with open(settings_path, 'w') as f:
+                with open(settings_path, 'w', encoding='utf-8') as f:
                     json.dump(mapping, f)
                 QMessageBox.information(self, self.tr("Успех"), self.tr("Настройки успешно сохранены."))
         except Exception as e:
@@ -683,7 +669,7 @@ class FileProcessorApp(QWidget):
         try:
             settings_path, _ = QFileDialog.getOpenFileName(self, self.tr("Загрузить настройки"), '', self.tr("JSON файлы (*.json)"))
             if settings_path:
-                with open(settings_path, 'r') as f:
+                with open(settings_path, 'r', encoding='utf-8') as f:
                     mapping = json.load(f)
                 self.apply_loaded_mapping(mapping)
         except Exception as e:
@@ -703,7 +689,7 @@ class FileProcessorApp(QWidget):
                 if index != -1:
                     combobox_dict[name].setCurrentIndex(index)
 
-    # ===================== Процесс копирования =====================
+    # ======= Процесс копирования =======
     def start_copying(self):
         try:
             self.go_to_progress_page()
@@ -717,7 +703,6 @@ class FileProcessorApp(QWidget):
             all_successful = True
             total_items = self.calculate_total_items()
             self.progress_bar.setMaximum(total_items)
-
             current_progress = 0
             for sheet_name in self.selected_sheets:
                 sheet = self.workbook[sheet_name]
@@ -817,11 +802,6 @@ class FileProcessorApp(QWidget):
         self.log_error(error_msg)
 
     def copy_cell_value(self, lang_sheet, sheet_name, row, copy_col_index, header_row, col_index):
-        """
-        Копирование значения ячейки с гарантией 100% совпадения исходного и целевого текста.
-        Если после нескольких попыток копирования контрольные суммы не совпадают, ячейка помечается, и
-        пользователю предлагается выбрать дальнейшие действия.
-        """
         source_value = lang_sheet.cell(row=row, column=copy_col_index).value
         if source_value is None:
             return True
@@ -844,12 +824,10 @@ class FileProcessorApp(QWidget):
         max_attempts = 5
         for attempt in range(max_attempts):
             target_cell.value = source_value
-            # Прямое сравнение значений + сравнение хешей
             if source_value == target_cell.value:
                 if compute_hash(target_cell.value) == source_hash:
                     return True
 
-        # Если после max_attempts копирование не удалось, подсвечиваем ячейку красным
         fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
         target_cell.fill = fill
 
@@ -872,7 +850,7 @@ class FileProcessorApp(QWidget):
         retry_button = msg_box.addButton(self.tr("Повторить"), QMessageBox.AcceptRole)
         save_button = msg_box.addButton(self.tr("Сохранить как есть"), QMessageBox.AcceptRole)
         abort_button = msg_box.addButton(self.tr("Остановить"), QMessageBox.RejectRole)
-        msg_box.exec_()
+        msg_box.exec()
 
         if msg_box.clickedButton() == retry_button:
             return self.copy_cell_value(lang_sheet, sheet_name, row, copy_col_index, header_row, col_index)

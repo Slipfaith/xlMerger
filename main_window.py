@@ -1,4 +1,6 @@
-from PyQt5.QtWidgets import QMainWindow, QAction, QMessageBox, QTabWidget
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+from PySide6.QtGui import QAction
+
 from gui.file_processor_app import FileProcessorApp
 from gui.limits_checker import LimitsChecker
 
