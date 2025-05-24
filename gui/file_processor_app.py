@@ -28,8 +28,8 @@ class FileProcessorApp(QWidget):
     def __init__(self):
         super().__init__()
         self.folder_path = ''
-        self.selected_files = []       # Только Excel-файлы для копирования переводов (полные пути)
-        self.excel_file_path = ''      # Основной Excel (полный путь)
+        self.selected_files = []
+        self.excel_file_path = ''
         self.copy_column = ''
         self.selected_sheets = []
         self.sheet_names = []
@@ -53,7 +53,6 @@ class FileProcessorApp(QWidget):
         self.setGeometry(300, 300, 600, 400)
         self.show()
 
-    # ======= Главная страница =======
     def create_main_page(self):
         widget = QWidget()
         layout = QVBoxLayout()
@@ -234,7 +233,6 @@ class FileProcessorApp(QWidget):
             return False
         return True
 
-    # ============= Страница выбора строки заголовка =============
     def create_header_page(self):
         page = QWidget()
         page.setWindowTitle("Выбери строку заголовка")
@@ -287,7 +285,6 @@ class FileProcessorApp(QWidget):
             self.log_error(e)
             QMessageBox.critical(self, "Ошибка", "Произошла ошибка при загрузке столбцов: " + str(e))
 
-    # ============= Страница соответствия лист-столбец =============
     def create_sheet_column_page(self):
         page = QWidget()
         page.setWindowTitle("Соответствие лист-столбец")
@@ -325,39 +322,32 @@ class FileProcessorApp(QWidget):
         self.stack.addWidget(self.page_sheet_column)
         self.stack.setCurrentWidget(self.page_sheet_column)
 
-    # ============= Страница сопоставления файл/папка-столбец =============
+    # ======== Изменённый блок: create_match_page + поддержка алфавитного порядка и "уже выбрано" ========
     def create_match_page(self):
         page = QWidget()
-
         excel_exts = ('.xlsx', '.xls')
         is_files = False
         is_folder_mapping = False
-
         files_in_root = []
         folders_with_excels = []
 
         if self.folder_path and os.path.isdir(self.folder_path):
             entries = os.listdir(self.folder_path)
-            # Разделяем на файлы и папки
             for entry in entries:
                 full_path = os.path.join(self.folder_path, entry)
                 if os.path.isfile(full_path) and entry.lower().endswith(excel_exts):
                     files_in_root.append(full_path)
                 elif os.path.isdir(full_path):
-                    # Есть подпапка — проверяем, есть ли в ней эксели
                     files = os.listdir(full_path)
                     if any(f.lower().endswith(excel_exts) for f in files):
                         folders_with_excels.append((entry, full_path))
 
-        # Если есть хотя бы одна подпапка с экселями — всегда режим по папкам!
         if folders_with_excels:
             is_folder_mapping = True
             is_files = False
-        # Если нет папок с экселями, но есть эксели в корне — режим по файлам
         elif files_in_root or self.selected_files:
             is_files = True
             is_folder_mapping = False
-            # Обновляем selected_files, если надо
             if not self.selected_files:
                 self.selected_files = files_in_root
 
@@ -374,8 +364,14 @@ class FileProcessorApp(QWidget):
         scroll_content.setLayout(scroll_layout)
         scroll_area.setWidget(scroll_content)
 
-        available_columns = [''] + list(set(sum([self.columns[sheet] for sheet in self.selected_sheets], [])))
+        # Алфавитный порядок!
+        all_columns = [col for sheet in self.selected_sheets for col in self.columns[sheet] if
+                       isinstance(col, str) and col.strip()]
+        available_columns = [''] + sorted(set(all_columns))
+
         row, col = 0, 0
+        self._all_comboboxes = []
+        self._combobox_keys = []  # Чтобы знать, какой combobox за какой файл/папку отвечает
 
         if is_files:
             self.file_to_column = {}
@@ -389,10 +385,11 @@ class FileProcessorApp(QWidget):
                 file_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 column_combobox = QComboBox()
                 column_combobox.setMaximumWidth(100)
-                column_combobox.addItems(available_columns)
+                self._all_comboboxes.append(column_combobox)
+                self._combobox_keys.append(file_path)
+                self.file_to_column[file_path] = column_combobox
                 scroll_layout.addWidget(file_label, row, col)
                 scroll_layout.addWidget(column_combobox, row, col + 1)
-                self.file_to_column[file_path] = column_combobox
                 row += 1
             self.folder_to_column = {}
         elif is_folder_mapping:
@@ -406,10 +403,11 @@ class FileProcessorApp(QWidget):
                 folder_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 column_combobox = QComboBox()
                 column_combobox.setMaximumWidth(100)
-                column_combobox.addItems(available_columns)
+                self._all_comboboxes.append(column_combobox)
+                self._combobox_keys.append(folder_full_path)
+                self.folder_to_column[folder_full_path] = column_combobox
                 scroll_layout.addWidget(folder_label, row, col)
                 scroll_layout.addWidget(column_combobox, row, col + 1)
-                self.folder_to_column[folder_full_path] = column_combobox
                 row += 1
             self.file_to_column = {}
         else:
@@ -435,14 +433,64 @@ class FileProcessorApp(QWidget):
         button_layout.addWidget(next_button)
         layout.addLayout(button_layout)
         page.setLayout(layout)
+
+        # Заполняем все комбобоксы
+        for combo in self._all_comboboxes:
+            combo.blockSignals(True)
+            combo.clear()
+            for val in available_columns:
+                combo.addItem(val)
+            combo.blockSignals(False)
+
+        # Связываем обновление
+        for combo in self._all_comboboxes:
+            combo.currentIndexChanged.connect(self.update_all_comboboxes_for_matching)
+
+        self._matching_available_columns = available_columns  # Сохраним для обновлений
+
         return page
+
+    def update_all_comboboxes_for_matching(self):
+        # Список выбранных значений (кроме пустых)
+        used_values = set()
+        for combo in self._all_comboboxes:
+            val = combo.currentText()
+            if val and val != "":
+                used_values.add(val)
+        # Обновить каждый комбобокс
+        for idx, combo in enumerate(self._all_comboboxes):
+            current_val = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            # Сначала — алфавитно все невыбранные нигде значения и (если есть) текущее
+            base_columns = self._matching_available_columns[1:]  # Без первого пустого
+            not_used = [v for v in base_columns if v not in used_values or v == current_val]
+            not_used = sorted(not_used)
+            # Уже выбранные в других комбобоксах
+            used_in_others = [v for v in base_columns if v in used_values and v != current_val]
+            used_in_others = sorted(used_in_others)
+            # Пустой элемент
+            combo.addItem('')
+            # Основные значения
+            for val in not_used:
+                combo.addItem(val)
+            # Разделитель
+            if used_in_others:
+                combo.addItem('---')
+                for val in used_in_others:
+                    combo.addItem(f"{val}")
+            # Восстанавливаем текущее значение
+            if current_val:
+                ix = combo.findText(current_val)
+                if ix >= 0:
+                    combo.setCurrentIndex(ix)
+            combo.blockSignals(False)
 
     def go_to_match_page(self):
         self.page_match = self.create_match_page()
         self.stack.addWidget(self.page_match)
         self.stack.setCurrentWidget(self.page_match)
 
-    # ============= Страница подтверждения сопоставления =============
     def create_confirmation_page(self):
         page = QWidget()
         page.setWindowTitle("Подтверждение сопоставления")
@@ -489,7 +537,6 @@ class FileProcessorApp(QWidget):
         else:
             return sorted(self.folder_to_column.items(), key=lambda x: (x[1].currentText() == "", x[0]))
 
-    # ============= Страница прогресса =============
     def create_progress_page(self):
         page = QWidget()
         page.setWindowTitle("Копирование переводов")
@@ -508,7 +555,6 @@ class FileProcessorApp(QWidget):
         self.stack.addWidget(self.page_progress)
         self.stack.setCurrentWidget(self.page_progress)
 
-    # ============= Страница завершения =============
     def create_completion_page(self):
         page = QWidget()
         page.setWindowTitle("Копирование завершено")
@@ -547,7 +593,6 @@ class FileProcessorApp(QWidget):
         self.folder_to_column = {}
         self.file_to_column = {}
 
-    # ============= Сохранение и загрузка сопоставления =============
     def save_mapping_settings(self):
         try:
             mapping = self.get_current_mapping()
@@ -590,16 +635,11 @@ class FileProcessorApp(QWidget):
                 if index != -1:
                     combobox_dict[name].setCurrentIndex(index)
 
-    # ============= Копирование (через ExcelProcessor) =============
     def start_copying(self):
         try:
             self.go_to_progress_page()
-
             file_to_column = {k: v.currentText() for k, v in self.file_to_column.items()} if self.file_to_column else {}
-            folder_to_column = {k: v.currentText() for k, v in
-                                self.folder_to_column.items()} if self.folder_to_column else {}
-
-            # Чёткая проверка папки при сопоставлении по папкам
+            folder_to_column = {k: v.currentText() for k, v in self.folder_to_column.items()} if self.folder_to_column else {}
             if folder_to_column:
                 if not self.folder_path or not os.path.isdir(self.folder_path):
                     raise FileNotFoundError("Указанная папка не существует.")
