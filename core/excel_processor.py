@@ -135,7 +135,9 @@ class ExcelProcessor:
 
     def _copy_cell_value(self, lang_sheet, sheet_name, row, copy_col_index, header_row, col_index):
         source_value = lang_sheet.cell(row=row, column=copy_col_index).value
-        if source_value is None:
+
+        # НЕ затираем целевую ячейку, если перевод пустой
+        if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
             return
 
         if self.copy_by_row_number:
@@ -160,5 +162,3 @@ class ExcelProcessor:
 
         fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
         target_cell.fill = fill
-        # Можно добавить raise Exception(...) если нужно остановить процесс при ошибке
-
