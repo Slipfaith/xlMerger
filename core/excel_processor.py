@@ -39,7 +39,7 @@ class ExcelProcessor:
         return cols
 
     def validate_paths_and_column(self):
-        if not os.path.exists(self.folder_path):
+        if self.folder_path and not os.path.isdir(self.folder_path):
             raise FileNotFoundError("Указанная папка не существует.")
         if not os.path.exists(self.main_excel_path):
             raise FileNotFoundError("Указанный файл Excel не существует.")
