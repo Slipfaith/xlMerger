@@ -155,7 +155,7 @@ class FileProcessorApp(QWidget):
         self.sheet_list.clear()
         for sheet_name in self.sheet_names:
             item = QListWidgetItem(sheet_name)
-            item.setCheckState(Qt.Unchecked)
+            item.setCheckState(Qt.Checked)
             self.sheet_list.addItem(item)
 
     def deselect_all_sheets(self):
