@@ -12,6 +12,7 @@ from gui.main_page import MainPageWidget
 from gui.pages.sheet_column_page import SheetColumnPage
 from gui.pages.match_page import MatchPage
 from gui.pages.confirm_page import ConfirmPage
+from gui.pages.progress_page import ProgressPage
 from core.main_page_logic import MainPageLogic
 from core.excel_processor import ExcelProcessor
 from gui.pages.header_row_page import HeaderRowPage  # подключаем новую страницу
@@ -148,21 +149,9 @@ class FileProcessorApp(QWidget):
         self.stack.setCurrentWidget(self.page_confirmation)
 
     # === Progress Page ===
-    def create_progress_page(self):
-        page = QWidget()
-        page.setWindowTitle("Копирование переводов")
-        layout = QVBoxLayout()
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar { text-align: center; }
-            QProgressBar::chunk { background-color: #f47929; }
-        """)
-        layout.addWidget(self.progress_bar)
-        page.setLayout(layout)
-        return page
-
     def go_to_progress_page(self):
-        self.page_progress = self.create_progress_page()
+        self.page_progress = ProgressPage()
+        self.progress_bar = self.page_progress.progress_bar  # Доступ к бару
         self.stack.addWidget(self.page_progress)
         self.stack.setCurrentWidget(self.page_progress)
 
@@ -255,7 +244,6 @@ class FileProcessorApp(QWidget):
     def start_copying(self):
         try:
             self.go_to_progress_page()
-            # Здесь просто копируем словари, в которых уже строки, а не QComboBox
             file_to_column = dict(self.file_to_column) if self.file_to_column else {}
             folder_to_column = dict(self.folder_to_column) if self.folder_to_column else {}
             folder_path = self.folder_path if folder_to_column else ''
@@ -274,7 +262,7 @@ class FileProcessorApp(QWidget):
             )
 
             def progress_callback(progress, total):
-                if self.progress_bar:
+                if hasattr(self, 'progress_bar') and self.progress_bar:
                     self.progress_bar.setMaximum(total)
                     self.progress_bar.setValue(progress)
                     QApplication.processEvents()
@@ -284,8 +272,6 @@ class FileProcessorApp(QWidget):
 
         except Exception as e:
             self.log_error(e)
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при запуске процесса копирования: {e}")
-
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при запуске процесса копирования: {e}")
 
     def finalize_copying_process(self, output_file):
