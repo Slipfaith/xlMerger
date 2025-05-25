@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from gui.main_page import MainPageWidget
 from gui.pages.sheet_column_page import SheetColumnPage
 from gui.pages.match_page import MatchPage
+from gui.pages.confirm_page import ConfirmPage
 from core.main_page_logic import MainPageLogic
 from core.excel_processor import ExcelProcessor
 from gui.pages.header_row_page import HeaderRowPage  # подключаем новую страницу
@@ -131,87 +132,20 @@ class FileProcessorApp(QWidget):
         self.go_to_confirmation_page()
 
     # === Confirmation Page ===
-    def create_confirmation_page(self):
-        page = QWidget()
-        page.setWindowTitle("Подтверждение сопоставления")
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Проверь сопоставление:"))
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QFrame()
-        scroll_layout = QGridLayout(scroll_content)
-        scroll_layout.setHorizontalSpacing(10)
-        scroll_content.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_content)
-        items = self.get_sorted_items()
-        row = 0
-        col = 0
-        for index, (name, combobox) in enumerate(items):
-            label = short_name_no_ext(os.path.basename(name), 5) if os.path.isabs(name) else short_name_no_ext(name, 5)
-            scroll_layout.addWidget(QLabel(f"{label}: {combobox.currentText()}"), row, col)
-            col += 1
-            if col > 1:
-                col = 0
-                row += 1
-        layout.addWidget(scroll_area)
-        button_layout = QHBoxLayout()
-        back_button = QPushButton("Назад")
-        start_button = QPushButton("Начать")
-        start_button.setStyleSheet("background-color: #f47929; color: white;")
-        back_button.clicked.connect(self.go_to_match_page)
-        start_button.clicked.connect(self.start_copying)
-        button_layout.addWidget(back_button)
-        button_layout.addWidget(start_button)
-        layout.addLayout(button_layout)
-        page.setLayout(layout)
-        return page
-
-    def go_to_confirmation_page(self):
-        self.page_confirmation = self.create_confirmation_page()
-        self.stack.addWidget(self.page_confirmation)
-        self.stack.setCurrentWidget(self.page_confirmation)
-
     def get_sorted_items(self):
-        # Теперь значения — это строки (названия колонок), а не QComboBox!
+        # Теперь значения — это строки (названия колонок)
         if self.file_to_column:
             return sorted(self.file_to_column.items(), key=lambda x: (x[1] == "", x[0]))
         else:
             return sorted(self.folder_to_column.items(), key=lambda x: (x[1] == "", x[0]))
 
-    def create_confirmation_page(self):
-        page = QWidget()
-        page.setWindowTitle("Подтверждение сопоставления")
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Проверь сопоставление:"))
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QFrame()
-        scroll_layout = QGridLayout(scroll_content)
-        scroll_layout.setHorizontalSpacing(10)
-        scroll_content.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_content)
-        items = self.get_sorted_items()
-        row = 0
-        col = 0
-        for index, (name, column_name) in enumerate(items):
-            label = short_name_no_ext(os.path.basename(name), 5) if os.path.isabs(name) else short_name_no_ext(name, 5)
-            scroll_layout.addWidget(QLabel(f"{label}: {column_name}"), row, col)
-            col += 1
-            if col > 1:
-                col = 0
-                row += 1
-        layout.addWidget(scroll_area)
-        button_layout = QHBoxLayout()
-        back_button = QPushButton("Назад")
-        start_button = QPushButton("Начать")
-        start_button.setStyleSheet("background-color: #f47929; color: white;")
-        back_button.clicked.connect(self.go_to_match_page)
-        start_button.clicked.connect(self.start_copying)
-        button_layout.addWidget(back_button)
-        button_layout.addWidget(start_button)
-        layout.addLayout(button_layout)
-        page.setLayout(layout)
-        return page
+    def go_to_confirmation_page(self):
+        items = self.get_sorted_items()  # [('файл', 'колонка'), ...]
+        self.page_confirmation = ConfirmPage(items)
+        self.page_confirmation.backClicked.connect(self.go_to_match_page)
+        self.page_confirmation.startClicked.connect(self.start_copying)
+        self.stack.addWidget(self.page_confirmation)
+        self.stack.setCurrentWidget(self.page_confirmation)
 
     # === Progress Page ===
     def create_progress_page(self):
