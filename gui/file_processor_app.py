@@ -140,7 +140,7 @@ class FileProcessorApp(QWidget):
             return sorted(self.folder_to_column.items(), key=lambda x: (x[1] == "", x[0]))
 
     def go_to_confirmation_page(self):
-        items = self.get_sorted_items()  # [('файл', 'колонка'), ...]
+        items = self.get_sorted_items()
         self.page_confirmation = ConfirmPage(items)
         self.page_confirmation.backClicked.connect(self.go_to_match_page)
         self.page_confirmation.startClicked.connect(self.start_copying)
@@ -194,11 +194,19 @@ class FileProcessorApp(QWidget):
     # === Save/Load Mapping ===
     def save_mapping_settings(self):
         try:
-            mapping = self.get_current_mapping()
-            settings_path, _ = QFileDialog.getSaveFileName(self, "Сохранить настройки", '', "JSON файлы (*.json)")
+            # Получаем актуальный маппинг с видимой страницы
+            mapping = {}
+            if hasattr(self, "page_match") and self.page_match:
+                mapping = self.page_match.get_current_mapping()
+            else:
+                mapping = {}  # ничего не сохранять если не на этой странице
+
+            settings_path, _ = QFileDialog.getSaveFileName(
+                self, "Сохранить настройки", '', "JSON файлы (*.json)"
+            )
             if settings_path:
                 with open(settings_path, 'w', encoding='utf-8') as f:
-                    json.dump(mapping, f)
+                    json.dump(mapping, f, ensure_ascii=False, indent=2)
                 QMessageBox.information(self, "Успех", "Настройки успешно сохранены.")
         except Exception as e:
             self.log_error(e)
@@ -216,7 +224,8 @@ class FileProcessorApp(QWidget):
             if settings_path:
                 with open(settings_path, 'r', encoding='utf-8') as f:
                     mapping = json.load(f)
-                self.apply_loaded_mapping(mapping)
+                # вот тут!
+                self.page_match.apply_mapping(mapping, mapping)
         except Exception as e:
             self.log_error(e)
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при загрузке настроек: {e}")
