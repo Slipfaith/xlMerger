@@ -3,15 +3,18 @@ import sys
 from PySide6 import QtWidgets, QtCore
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
-    QPushButton, QFileDialog, QComboBox, QMessageBox, QStackedWidget, QTextEdit,
+    QPushButton, QMessageBox, QStackedWidget, QTextEdit,
     QSplitter, QListWidget, QMenu
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-# Универсальная функция для приведения значения к целому числу
+# Импорт стартового экрана
+from gui.limit_check.limit_check_file_page import FileSelectionPage  # проверь путь
+
+# ==================== Универсальная функция ====================
 def _get_int_value(value):
     try:
         s = str(value).strip()
@@ -19,27 +22,9 @@ def _get_int_value(value):
     except Exception:
         return None
 
-# ==================== DragDropLineEdit ====================
-class DragDropLineEdit(QLineEdit):
-    def __init__(self, update_callback, parent=None):
-        super().__init__(parent)
-        self.setAcceptDrops(True)
-        self.update_callback = update_callback
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        if urls and urls[0].isLocalFile():
-            file_path = urls[0].toLocalFile()
-            self.setText(file_path)
-            self.update_callback(file_path)
-
 # ==================== DraggableHeaderView ====================
 class DraggableHeaderView(QtWidgets.QHeaderView):
-    dragSelectionChanged = Signal(set)
+    dragSelectionChanged = QtCore.Signal(set)
 
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -392,7 +377,7 @@ class LimitsMappingPreviewDialog(QtWidgets.QDialog):
             return
         super().accept()
 
-# ==================== Основной класс LimitsChecker ====================
+# ==================== LimitsChecker ====================
 class LimitsChecker(QWidget):
     def __init__(self):
         super().__init__()
@@ -409,49 +394,19 @@ class LimitsChecker(QWidget):
         self.headers = []
         self.mappings = []
         self.report_text = ""
-        self.file_page = self.create_file_selection_page()
+
+        self.file_page = FileSelectionPage()
         self.stack.addWidget(self.file_page)
 
-    def create_file_selection_page(self):
-        page = QWidget()
-        layout = QVBoxLayout()
-        file_group = QGroupBox("Выбор файла (нажмите 'Обзор...' или перетащите файл сюда)")
-        file_layout = QHBoxLayout()
-        self.file_line = DragDropLineEdit(self.update_sheet_list)
-        self.browse_button = QPushButton("Обзор...")
-        self.browse_button.clicked.connect(self.select_file)
-        file_layout.addWidget(self.file_line)
-        file_layout.addWidget(self.browse_button)
-        file_group.setLayout(file_layout)
-        layout.addWidget(file_group)
-        sheet_group = QGroupBox("Выбор листа")
-        sheet_layout = QHBoxLayout()
-        self.sheet_combo = QComboBox()
-        sheet_layout.addWidget(self.sheet_combo)
-        sheet_group.setLayout(sheet_layout)
-        layout.addWidget(sheet_group)
-        btn_layout = QHBoxLayout()
-        self.map_button = QPushButton("Лимиты")
-        self.map_button.clicked.connect(self.open_mapping_dialog)
-        self.next_button = QPushButton("Далее")
-        self.next_button.clicked.connect(self.goto_results_page)
-        btn_layout.addWidget(self.map_button)
-        btn_layout.addWidget(self.next_button)
-        layout.addLayout(btn_layout)
-        page.setLayout(layout)
-        return page
-
-    def select_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Выберите Excel файл", "", "Excel Files (*.xlsx *.xls)")
-        if file_path:
-            self.file_line.setText(file_path)
-            self.update_sheet_list(file_path)
+        # Сигналы стартового экрана
+        self.file_page.file_selected.connect(self.update_sheet_list)
+        self.file_page.mapping_clicked.connect(self.open_mapping_dialog)
+        self.file_page.next_clicked.connect(self.goto_results_page)
 
     def update_sheet_list(self, file_path):
         try:
             wb = load_workbook(file_path, read_only=True)
-            self.sheet_combo.clear()
-            self.sheet_combo.addItems(wb.sheetnames)
+            self.file_page.set_sheets(wb.sheetnames)
             self.selected_file = file_path
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить листы: {e}")
@@ -460,7 +415,7 @@ class LimitsChecker(QWidget):
         if not self.selected_file:
             QMessageBox.critical(self, "Ошибка", "Выберите файл Excel.")
             return
-        self.sheet_name = self.sheet_combo.currentText()
+        self.sheet_name = self.file_page.current_sheet()
         try:
             self.workbook = load_workbook(self.selected_file)
             self.sheet = self.workbook[self.sheet_name]
@@ -548,7 +503,7 @@ class LimitsChecker(QWidget):
                             total_violations += 1
                             header = self.headers[txt_idx - 1]
                             report_lines.append(f"Строка {row_num}, столбец '{header}': {detail}")
-        # Ручной режим: проверяем каждый сохранённый диапазон ячеек, без дополнительного смещения (при сохранении уже прибавлено +2)
+        # Ручной режим: проверяем каждый сохранённый диапазон ячеек
         for m in mapping_indices:
             if m[0] == "cell":
                 _, selected_cells, manual, upper, lower, _ = m
