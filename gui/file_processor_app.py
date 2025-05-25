@@ -56,18 +56,23 @@ class FileProcessorApp(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.stack)
         self.setLayout(layout)
-        self.center_window()
         self.setGeometry(300, 300, 600, 400)
+        self.center_window()
         self.show()
 
     def process_files(self):
         self.selected_files = self.main_page_logic.selected_files
         self.folder_path = self.main_page_logic.folder_path
-        self.copy_column = self.main_page_logic.copy_column
+        self.copy_column = self.main_page_logic.copy_column.strip()
         self.selected_sheets = self.main_page_logic.get_selected_sheets()
         self.excel_file_path = self.main_page_logic.excel_file_path
         self.skip_first_row = self.page_main.skip_first_row_checkbox.isChecked()
         self.copy_by_row_number = self.page_main.copy_by_row_number_radio.isChecked()
+
+        if not self.copy_column:
+            QMessageBox.warning(self, "Ошибка", "Укажи столбец для копирования.")
+            return  # НЕ переходим дальше
+
         self.go_to_header_page()
 
     def preview_excel(self):

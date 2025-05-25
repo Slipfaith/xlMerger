@@ -7,7 +7,7 @@ from gui.limits_checker import LimitsChecker
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(self.tr("File Processor Application"))
+        self.setWindowTitle(self.tr("xlMerger: объединяй и проверяй"))
         self.init_menu()
 
         # Создаем QTabWidget и добавляем вкладки
@@ -39,4 +39,4 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def show_about(self):
-        QMessageBox.information(self, self.tr("About"), self.tr("Объединяй и проверяй\nVersion 03.15.2025"))
+        QMessageBox.information(self, self.tr("About"), self.tr("Объединяй и проверяй\nVersion 2 25.05.2025"))

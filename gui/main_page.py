@@ -40,18 +40,19 @@ class MainPageWidget(QWidget):
     def create_folder_selection_layout(self):
         layout = QHBoxLayout()
         self.folder_entry = DragDropLineEdit(mode='files_or_folder')
-        self.folder_entry.setPlaceholderText("Перетащи папку или эксели, или кликни дважды")
+        self.folder_entry.setPlaceholderText("Перетащи или кликни дважды")
         self.folder_entry.filesSelected.connect(self.filesSelected)
         self.folder_entry.folderSelected.connect(self.folderSelected)
-        layout.addWidget(QLabel("Папка/файлы переводов:"))
+        layout.addWidget(QLabel("Папка/эксели с переводами:"))
         layout.addWidget(self.folder_entry)
         return layout
 
     def create_excel_selection_layout(self):
         layout = QHBoxLayout()
         self.excel_file_entry = DragDropLineEdit(mode='file')
+        self.excel_file_entry.setPlaceholderText("Перетащи или кликни дважды")
         self.excel_file_entry.fileSelected.connect(self.excelFileSelected)
-        layout.addWidget(QLabel("Файл Excel:"))
+        layout.addWidget(QLabel("Целевой Excel:"))
         layout.addWidget(self.excel_file_entry)
         return layout
 
@@ -61,7 +62,7 @@ class MainPageWidget(QWidget):
         self.sheet_list.setSelectionMode(QListWidget.MultiSelection)
         self.sheet_list.setFixedHeight(100)
         button_layout = QHBoxLayout()
-        deselect_all_button = QPushButton("Снять выделение со всех", self)
+        deselect_all_button = QPushButton("Не выбрать все", self)
         select_all_button = QPushButton("Выбрать все", self)
         deselect_all_button.clicked.connect(self.deselect_all_sheets)
         select_all_button.clicked.connect(self.select_all_sheets)
@@ -84,7 +85,7 @@ class MainPageWidget(QWidget):
         layout = QHBoxLayout()
         self.copy_column_entry = QLineEdit(self)
         self.copy_column_entry.setMaximumWidth(100)
-        copy_column_label = QLabel("Столбец копирования:")
+        copy_column_label = QLabel("Из какой колонки копировать? (буква колонки):")
         copy_column_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(copy_column_label)
         layout.addWidget(self.copy_column_entry)
