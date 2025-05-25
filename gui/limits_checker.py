@@ -11,8 +11,8 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-# Импорт стартового экрана
 from gui.limit_check.limit_check_file_page import FileSelectionPage  # проверь путь
+from core.limit_auto import check_limits_auto  # Новый импорт для авто-режима
 
 # ==================== Универсальная функция ====================
 def _get_int_value(value):
@@ -449,64 +449,18 @@ class LimitsChecker(QWidget):
         if not self.mappings:
             QMessageBox.critical(self, "Ошибка", "Не заданы сопоставления лимитов.")
             return
+        # ----- Весь авто-режим вынесен в отдельный модуль -----
         report_lines = []
         total_violations = 0
-        mapping_indices = []
-        for mapping in self.mappings:
-            if mapping[-1] == "column":
-                try:
-                    limit_index = self.headers.index(mapping[0]) + 1
-                except ValueError:
-                    QMessageBox.critical(self, "Ошибка", f"Столбец '{mapping[0]}' не найден.")
-                    return
-                text_indices = []
-                for txt in mapping[1]:
-                    try:
-                        text_indices.append(self.headers.index(txt) + 1)
-                    except ValueError:
-                        QMessageBox.critical(self, "Ошибка", f"Столбец '{txt}' не найден.")
-                        return
-                mapping_indices.append(("column", limit_index, text_indices, mapping[2], mapping[3], mapping[4]))
-            else:
-                mapping_indices.append(("cell", mapping[0], mapping[1], mapping[2], mapping[3], mapping[4]))
-        # Автоматический режим: проверяем каждую строку, сравниваем с лимитом из ячейки
-        for row in self.sheet.iter_rows(min_row=2, values_only=False):
-            row_num = row[0].row
-            for m in mapping_indices:
-                if m[0] == "column":
-                    _, limit_idx, text_idxs, manual, upper, lower = m
-                    limit_cell = row[limit_idx - 1]
-                    if manual:
-                        current_limit = _get_int_value(upper)
-                        current_lower = _get_int_value(lower)
-                    else:
-                        current_limit = _get_int_value(limit_cell.value)
-                        current_lower = None
-                    for txt_idx in text_idxs:
-                        text_cell = row[txt_idx - 1]
-                        cell_text = text_cell.value
-                        if cell_text is None:
-                            continue
-                        text_str = str(cell_text)
-                        text_length = len(text_str)
-                        violation = False
-                        detail = ""
-                        if current_limit is not None and text_length > current_limit:
-                            violation = True
-                            detail += f"длина = {text_length} (лимит {current_limit})"
-                        if current_lower is not None and text_length < current_lower:
-                            violation = True
-                            detail += f", длина = {text_length} (нижний лимит {current_lower})"
-                        if violation:
-                            fill = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
-                            text_cell.fill = fill
-                            total_violations += 1
-                            header = self.headers[txt_idx - 1]
-                            report_lines.append(f"Строка {row_num}, столбец '{header}': {detail}")
-        # Ручной режим: проверяем каждый сохранённый диапазон ячеек
-        for m in mapping_indices:
-            if m[0] == "cell":
-                _, selected_cells, manual, upper, lower, _ = m
+        try:
+            report_lines, total_violations = check_limits_auto(self.sheet, self.headers, self.mappings)
+        except ValueError as e:
+            QMessageBox.critical(self, "Ошибка", str(e))
+            return
+        # ----- Ручной режим как был -----
+        for m in self.mappings:
+            if m[-1] == "cell":
+                selected_cells, manual, upper, lower, _ = m
                 current_limit = _get_int_value(upper)
                 current_lower = _get_int_value(lower)
                 for (model_row, col) in selected_cells:
