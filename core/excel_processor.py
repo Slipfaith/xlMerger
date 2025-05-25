@@ -1,13 +1,15 @@
 import os
 import hashlib
-import traceback
 from openpyxl import load_workbook
 import openpyxl.utils as utils
 from openpyxl.styles import PatternFill
 
 class ExcelProcessor:
-    def __init__(self, main_excel_path, folder_path, copy_column, selected_sheets, sheet_to_header_row,
-                 sheet_to_column, file_to_column=None, folder_to_column=None, skip_first_row=False, copy_by_row_number=False):
+    def __init__(
+        self, main_excel_path, folder_path, copy_column, selected_sheets,
+        sheet_to_header_row, sheet_to_column, file_to_column=None, folder_to_column=None,
+        skip_first_row=False, copy_by_row_number=False
+    ):
         self.main_excel_path = main_excel_path
         self.folder_path = folder_path
         self.copy_column = copy_column
@@ -55,12 +57,12 @@ class ExcelProcessor:
         for sheet_name in self.selected_sheets:
             header_row_index = self.sheet_to_header_row[sheet_name]
             self.header_row[sheet_name] = header_row_index
-            self.columns[sheet_name] = [cell.value for cell in self.workbook[sheet_name][header_row_index + 1]]
+            self.columns[sheet_name] = [
+                cell.value for cell in self.workbook[sheet_name][header_row_index + 1]
+            ]
 
-        # Определяем, работаем с файлами или папками
         is_file_mapping = bool(self.file_to_column)
         items = self.file_to_column.items() if is_file_mapping else self.folder_to_column.items()
-
         total_steps = len(self.selected_sheets) * len([c for _, c in items if c]) if items else 1
         progress = 0
 
@@ -73,15 +75,21 @@ class ExcelProcessor:
                 if not column_name:
                     continue
                 if column_name not in self.columns[sheet_name]:
-                    raise Exception(f"Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel.")
+                    raise Exception(
+                        f"Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel."
+                    )
 
                 col_index = self.columns[sheet_name].index(column_name) + 1
                 if is_file_mapping:
                     file_path = os.path.join(self.folder_path, name)
-                    self._copy_from_file(file_path, sheet_name, copy_col_index, header_row, col_index, name, column_name)
+                    self._copy_from_file(
+                        file_path, sheet_name, copy_col_index, header_row, col_index
+                    )
                 else:
                     lang_folder_path = os.path.join(self.folder_path, name)
-                    self._copy_from_folder(lang_folder_path, sheet_name, copy_col_index, header_row, col_index, name, column_name)
+                    self._copy_from_folder(
+                        lang_folder_path, sheet_name, copy_col_index, header_row, col_index
+                    )
                 progress += 1
                 if progress_callback:
                     progress_callback(progress, total_steps)
@@ -93,13 +101,10 @@ class ExcelProcessor:
         return output_file
 
     def _find_matching_sheet(self, lang_wb, main_sheet_name):
-        # 1. Если совпадает имя листа — используем его
         if main_sheet_name in lang_wb.sheetnames:
             return main_sheet_name
-        # 2. Если один лист — берем его
         elif len(lang_wb.sheetnames) == 1:
             return lang_wb.sheetnames[0]
-        # 3. Нет совпадения, несколько листов — ошибка
         else:
             raise Exception(
                 f"Не найден лист '{main_sheet_name}' в файле перевода. "
@@ -107,58 +112,53 @@ class ExcelProcessor:
                 f"Переименуйте листы для автоматического сопоставления, либо удалите лишние листы."
             )
 
-    def _copy_from_file(self, file_path, main_sheet_name, copy_col_index, header_row, col_index, name, column_name):
-        if os.path.isfile(file_path) and name.endswith(('.xlsx', '.xls')):
+    def _copy_from_file(self, file_path, main_sheet_name, copy_col_index, header_row, col_index):
+        if os.path.isfile(file_path) and file_path.endswith(('.xlsx', '.xls')):
             lang_wb = load_workbook(file_path)
             target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name)
             lang_sheet = lang_wb[target_sheet_name]
-            start_row = 2 if self.skip_first_row else 1
-            for row in range(start_row, lang_sheet.max_row + 1):
-                if self.copy_by_row_number and row == header_row + 1:
-                    continue
-                self._copy_cell_value(lang_sheet, main_sheet_name, row, copy_col_index, header_row, col_index)
+            self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
             lang_wb.close()
 
-    def _copy_from_folder(self, lang_folder_path, main_sheet_name, copy_col_index, header_row, col_index, name, column_name):
+    def _copy_from_folder(self, lang_folder_path, main_sheet_name, copy_col_index, header_row, col_index):
         for filename in os.listdir(lang_folder_path):
             file_path = os.path.join(lang_folder_path, filename)
             if os.path.isfile(file_path) and filename.endswith(('.xlsx', '.xls')):
                 lang_wb = load_workbook(file_path)
                 target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name)
                 lang_sheet = lang_wb[target_sheet_name]
-                start_row = 2 if self.skip_first_row else 1
-                for row in range(start_row, lang_sheet.max_row + 1):
-                    if self.copy_by_row_number and row == header_row + 1:
-                        continue
-                    self._copy_cell_value(lang_sheet, main_sheet_name, row, copy_col_index, header_row, col_index)
+                self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
                 lang_wb.close()
 
-    def _copy_cell_value(self, lang_sheet, sheet_name, row, copy_col_index, header_row, col_index):
-        source_value = lang_sheet.cell(row=row, column=copy_col_index).value
+    def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
+        """
+        Теперь вне зависимости от режима — **всегда** пропускаем строку-заголовок из перевода!
+        """
+        for row in range(1, lang_sheet.max_row + 1):
+            if row == header_row + 1:
+                continue  # Всегда пропускаем строку-заголовок (например, 'RU' или что там)
+            source_value = lang_sheet.cell(row=row, column=copy_col_index).value
+            if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
+                continue
+            if self.copy_by_row_number:
+                target_row = row
+            else:
+                offset = 2 if self.skip_first_row else 1
+                target_row = header_row + offset + (row - offset)
+            self._set_cell(sheet_name, target_row, col_index, source_value)
 
-        # НЕ затираем целевую ячейку, если перевод пустой
-        if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
-            return
-
-        if self.copy_by_row_number:
-            target_row = row
-        else:
-            start_row_offset = 2 if self.skip_first_row else 1
-            target_row = header_row + start_row_offset + (row - start_row_offset)
-
+    def _set_cell(self, sheet_name, target_row, col_index, value):
         target_cell = self.workbook[sheet_name].cell(row=target_row, column=col_index)
-
         def compute_hash(text):
             if text is None:
                 text = ""
-            return hashlib.sha256(text.encode('utf-8')).hexdigest()
-
-        source_hash = compute_hash(source_value)
+            return hashlib.sha256(str(text).encode('utf-8')).hexdigest()
+        source_hash = compute_hash(value)
         max_attempts = 5
         for attempt in range(max_attempts):
-            target_cell.value = source_value
-            if source_value == target_cell.value and compute_hash(target_cell.value) == source_hash:
-                return
-
-        fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-        target_cell.fill = fill
+            target_cell.value = value
+            if value == target_cell.value and compute_hash(target_cell.value) == source_hash:
+                break
+        else:
+            fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+            target_cell.fill = fill
