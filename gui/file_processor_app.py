@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from gui.main_page import MainPageWidget
+from gui.pages.sheet_column_page import SheetColumnPage
 from core.main_page_logic import MainPageLogic
 from core.excel_processor import ExcelProcessor
 from gui.pages.header_row_page import HeaderRowPage  # подключаем новую страницу
@@ -95,42 +96,16 @@ class FileProcessorApp(QWidget):
             self.log_error(e)
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при загрузке столбцов: {e}")
 
-    def create_sheet_column_page(self):
-        page = QWidget()
-        page.setWindowTitle("Соответствие лист-столбец")
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Из какого столбца на каждом листе копировать?"))
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QFrame()
-        scroll_layout = QGridLayout(scroll_content)
-        scroll_content.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_content)
-        self.sheet_to_column = {}
-        for row, sheet_name in enumerate(self.selected_sheets):
-            sheet_label = QLabel(sheet_name)
-            column_entry = QLineEdit()
-            column_entry.setMaximumWidth(100)
-            column_entry.setText(self.copy_column)
-            scroll_layout.addWidget(sheet_label, row, 0)
-            scroll_layout.addWidget(column_entry, row, 1)
-            self.sheet_to_column[sheet_name] = column_entry
-        layout.addWidget(scroll_area)
-        button_layout = QHBoxLayout()
-        back_button = QPushButton("Назад")
-        next_button = QPushButton("Далее")
-        back_button.clicked.connect(self.go_to_header_page)
-        next_button.clicked.connect(self.go_to_match_page)
-        button_layout.addWidget(back_button)
-        button_layout.addWidget(next_button)
-        layout.addLayout(button_layout)
-        page.setLayout(layout)
-        return page
-
     def go_to_sheet_column_page(self):
-        self.page_sheet_column = self.create_sheet_column_page()
+        self.page_sheet_column = SheetColumnPage(self.selected_sheets, self.copy_column)
+        self.page_sheet_column.backClicked.connect(self.go_to_header_page)
+        self.page_sheet_column.nextClicked.connect(self.handle_sheet_column_selected)
         self.stack.addWidget(self.page_sheet_column)
         self.stack.setCurrentWidget(self.page_sheet_column)
+
+    def handle_sheet_column_selected(self, sheet_to_column):
+        self.sheet_to_column = sheet_to_column
+        self.go_to_match_page()
 
     # === Match Page (file/papka -> column mapping) ===
     def create_match_page(self):
