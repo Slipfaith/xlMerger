@@ -20,46 +20,42 @@ class SheetColumnPage(QWidget):
 
         scroll_area = QScrollArea(self)
         scroll_area.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_content_layout = QVBoxLayout(scroll_content)
-        scroll_content_layout.setSpacing(12)  # чуть воздуха между парами
+        scroll_content = QFrame()
+        vbox = QVBoxLayout(scroll_content)
+        vbox.setSpacing(0)
+        vbox.setContentsMargins(20, 12, 20, 12)
+        scroll_content.setLayout(vbox)
+        scroll_area.setWidget(scroll_content)
 
         for sheet_name in self.selected_sheets:
-            # ОДИН БЛОК: имя + поле под ним, компактно!
-            block = QWidget()
-            block_layout = QVBoxLayout(block)
-            block_layout.setSpacing(2)
-            block_layout.setContentsMargins(0, 0, 0, 0)
-
             label = QLabel(sheet_name)
             label.setAlignment(Qt.AlignLeft)
-            label.setStyleSheet("font-size: 11pt;")  # <--- обязательно! Чтобы совпадал с entry
+            label.setStyleSheet("font-size: 14px; margin-bottom: 0px; padding-bottom: 0px;")
 
             entry = QLineEdit()
             entry.setMaximumWidth(120)
             entry.setText(self.default_column)
             entry.setStyleSheet("font-size: 11pt; padding: 0px; margin: 0px;")
 
-            block_layout.addWidget(label)
-            block_layout.addWidget(entry)
-            block_layout.addStretch(0)  # нет искусственного растяжения!
-
+            vbox.addWidget(label, alignment=Qt.AlignLeft)
+            vbox.addWidget(entry, alignment=Qt.AlignLeft)
+            vbox.addSpacing(2)
             self.sheet_to_column_widgets[sheet_name] = entry
-            scroll_content_layout.addWidget(block, alignment=Qt.AlignLeft)
 
-        scroll_content_layout.addStretch(1)  # чтобы все блоки были сверху!
-        scroll_area.setWidget(scroll_content)
         layout.addWidget(scroll_area)
 
+        # Кнопки - строго справа
         button_layout = QHBoxLayout()
-        back_button = QPushButton("Назад")
-        next_button = QPushButton("Далее")
-        back_button.clicked.connect(self.backClicked.emit)
-        next_button.clicked.connect(self._on_next)
-        button_layout.addWidget(back_button)
-        button_layout.addWidget(next_button)
+        self.back_btn = QPushButton("Назад")
+        self.next_btn = QPushButton("Далее")
+        self.back_btn.clicked.connect(self.backClicked.emit)
+        self.next_btn.clicked.connect(self._on_next_clicked)
+        button_layout.addStretch()
+        button_layout.addWidget(self.back_btn)
+        button_layout.addWidget(self.next_btn)
         layout.addLayout(button_layout)
+        vbox.addStretch(1)
 
-    def _on_next(self):
+    def _on_next_clicked(self):
         sheet_to_column = {k: v.text().strip() for k, v in self.sheet_to_column_widgets.items()}
         self.nextClicked.emit(sheet_to_column)

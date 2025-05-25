@@ -1,0 +1,35 @@
+import datetime
+import os
+
+class Logger:
+    def __init__(self, log_file="copy_log.txt"):
+        self.log_file = log_file
+        self.entries = []
+
+    def log(self, message):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        entry = f"[{timestamp}] {message}"
+        self.entries.append(entry)
+
+    def log_copy(self, sheet, row, col, value):
+        msg = f"COPY: {sheet} R{row}C{col} -> {repr(value)}"
+        self.log(msg)
+
+    def log_error(self, sheet, row, col, value):
+        msg = f"ERROR: {sheet} R{row}C{col} -> {repr(value)}"
+        self.log(msg)
+
+    def log_info(self, text):
+        self.log(f"INFO: {text}")
+
+    def log_warning(self, text):
+        self.log(f"WARNING: {text}")
+
+    def save(self):
+        if not self.entries:
+            return
+        os.makedirs(os.path.dirname(self.log_file) or ".", exist_ok=True)
+        with open(self.log_file, "a", encoding="utf-8") as f:
+            for entry in self.entries:
+                f.write(entry + "\n")
+        self.entries.clear()
