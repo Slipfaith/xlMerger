@@ -1,20 +1,19 @@
-import os
 import sys
-from PySide6 import QtWidgets, QtCore
+import os
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
-    QPushButton, QMessageBox, QStackedWidget, QTextEdit,
-    QSplitter, QListWidget, QMenu
+    QApplication, QWidget, QDialog, QVBoxLayout, QHBoxLayout, QTableView, QLabel,
+    QLineEdit, QPushButton, QGroupBox, QListWidget, QMenu, QRadioButton,
+    QStackedWidget, QTextEdit, QMessageBox, QHeaderView
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
 
-from gui.limit_check.limit_check_file_page import FileSelectionPage  # проверь путь
-from core.limit_auto import check_limits_auto  # Новый импорт для авто-режима
+from core.drag_drop import DragDropLineEdit
+from gui.limit_check.limit_check_file_page import FileSelectionPage
+from core.limit_auto import check_limits_auto
+from core.limit_manual import check_limits_manual
 
-# ==================== Универсальная функция ====================
 def _get_int_value(value):
     try:
         s = str(value).strip()
@@ -22,9 +21,9 @@ def _get_int_value(value):
     except Exception:
         return None
 
-# ==================== DraggableHeaderView ====================
-class DraggableHeaderView(QtWidgets.QHeaderView):
-    dragSelectionChanged = QtCore.Signal(set)
+# --- DRAGGABLE HEADER FOR DRAG-SELECT ---
+class DraggableHeaderView(QHeaderView):
+    dragSelectionChanged = Signal(set)  # set индексов колонок
 
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -34,17 +33,18 @@ class DraggableHeaderView(QtWidgets.QHeaderView):
         self._drag_current = None
 
     def mousePressEvent(self, event):
-        index = self.logicalIndexAt(event.pos())
-        if index >= 0:
-            self._drag_start = index
-            self._drag_current = index
-            self._dragging = True
-            self.dragSelectionChanged.emit({index})
+        if event.button() == Qt.LeftButton:
+            index = self.logicalIndexAt(event.position().toPoint())
+            if index >= 0:
+                self._drag_start = index
+                self._drag_current = index
+                self._dragging = True
+                self.dragSelectionChanged.emit({index})
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._dragging:
-            index = self.logicalIndexAt(event.pos())
+            index = self.logicalIndexAt(event.position().toPoint())
             if index >= 0 and index != self._drag_current:
                 self._drag_current = index
                 start = min(self._drag_start, self._drag_current)
@@ -57,327 +57,292 @@ class DraggableHeaderView(QtWidgets.QHeaderView):
         self._dragging = False
         super().mouseReleaseEvent(event)
 
-# ==================== LimitsMappingPreviewDialog ====================
-class LimitsMappingPreviewDialog(QtWidgets.QDialog):
+# --- FILE SELECTION PAGE (DRAG&DROP, 2x CLICK) ---
+class FileSelectionPage(QWidget):
+    file_selected = Signal(str)
+    mapping_clicked = Signal()
+    next_clicked = Signal()
+
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        self.file_input = DragDropLineEdit(mode='file')
+        self.file_input.setPlaceholderText("Перетащи Excel-файл сюда или дважды кликни для выбора...")
+        self.file_input.fileSelected.connect(self.file_selected_handler)
+        layout.addWidget(QLabel("Файл Excel:"))
+        layout.addWidget(self.file_input)
+        self.sheet_label = QLabel("Лист: (не выбран)")
+        layout.addWidget(self.sheet_label)
+        self.mapping_btn = QPushButton("Сопоставить лимиты")
+        self.mapping_btn.clicked.connect(self.mapping_clicked.emit)
+        layout.addWidget(self.mapping_btn)
+        self.next_btn = QPushButton("Далее")
+        self.next_btn.clicked.connect(self.next_clicked.emit)
+        layout.addWidget(self.next_btn)
+        self._sheetnames = []
+        self._current_sheet = ""
+
+    def file_selected_handler(self, file_path):
+        self.file_selected.emit(file_path)
+
+    def set_sheets(self, sheets):
+        self._sheetnames = sheets
+        self._current_sheet = sheets[0] if sheets else ""
+        self.sheet_label.setText(f"Лист: {self._current_sheet}")
+
+    def current_sheet(self):
+        return self._current_sheet
+
+# --- МAPPING DIALOG ---
+class MappingDialog(QDialog):
     def __init__(self, model: QStandardItemModel, headers: list, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Интерактивное сопоставление лимитов")
+        self.setWindowTitle("Сопоставление лимитов")
         self.resize(800, 600)
         self.headers = headers
         self.model = model
-        self.manual = False
-        self.current_limit = None
-        self.current_texts = set()
         self.mappings = []
+
+        self.mode_auto = True
+        self.current_limit_col = None
+        self.current_text_cols = set()
+        self.manual_selected = set()
+        self.saved_manual_cells = set()  # Для окраски подтверждённых вручную ячеек
         self.init_ui()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        self.manual_checkbox = QtWidgets.QCheckBox("Вручную задавать лимиты")
-        self.manual_checkbox.stateChanged.connect(self.toggle_manual_mode)
-        main_layout.addWidget(self.manual_checkbox)
 
-        splitter = QSplitter(Qt.Vertical)
-        top_widget = QWidget()
-        top_layout = QVBoxLayout(top_widget)
-        instruction = QLabel(
-            "Если ручной режим не активен, кликните по заголовку для выбора столбца с лимитом (синим),\n"
-            "а затем, перетаскивая, выберите текстовые столбцы (зелёным).\n\n"
-            "Если ручной режим активен, выделяйте нужный диапазон ячеек – стандартное выделение будет видно."
+        # Переключатель режимов
+        mode_layout = QHBoxLayout()
+        self.auto_radio = QRadioButton("Автоматический режим")
+        self.manual_radio = QRadioButton("Ручной режим")
+        self.auto_radio.setChecked(True)
+        self.auto_radio.toggled.connect(self.switch_mode)
+        mode_layout.addWidget(self.auto_radio)
+        mode_layout.addWidget(self.manual_radio)
+        main_layout.addLayout(mode_layout)
+
+        # Инструкции
+        self.info_label = QLabel(
+            "Автоматический: выбери столбец лимитов (синий), затем перетяни мышкой по заголовкам — выделишь текстовые столбцы (зелёный).\n"
+            "Ручной: выдели любые ячейки мышкой, введи лимиты вручную."
         )
-        top_layout.addWidget(instruction)
-        self.table_view = QtWidgets.QTableView()
-        self.table_view.setModel(self.model)
-        self.table_view.setStyleSheet("QTableView::item { color: black; }")
-        self.header_view = DraggableHeaderView(Qt.Horizontal, self.table_view)
-        self.table_view.setHorizontalHeader(self.header_view)
-        self.header_view.dragSelectionChanged.connect(self.handle_drag_selection)
-        self.table_view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.table_view.selectionModel().selectionChanged.connect(self.update_header_colors)
-        top_layout.addWidget(self.table_view)
-        self.current_mapping_label = QLabel("Текущая настройка: Не выбрано")
-        top_layout.addWidget(self.current_mapping_label)
+        main_layout.addWidget(self.info_label)
 
-        manual_group = QGroupBox("Ручная настройка лимитов")
+        # Таблица предпросмотра
+        self.table = QTableView()
+        self.table.setModel(self.model)
+        self.table.setEditTriggers(QTableView.NoEditTriggers)
+        self.table.setSelectionMode(QTableView.NoSelection)
+        self.table.setSelectionBehavior(QTableView.SelectItems)
+        self.header_view = DraggableHeaderView(Qt.Horizontal, self.table)
+        self.table.setHorizontalHeader(self.header_view)
+        self.header_view.dragSelectionChanged.connect(self.handle_drag_selection)
+        self.table.selectionModel().selectionChanged.connect(self.on_selection_changed)
+
+        # Настройки для избежания drag-resize в ручном режиме:
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
+
+        main_layout.addWidget(self.table)
+
+        # Поля лимитов (только для ручного режима)
+        self.manual_group = QGroupBox("Ручной ввод лимитов")
         manual_layout = QHBoxLayout()
         self.upper_limit_edit = QLineEdit()
         self.upper_limit_edit.setPlaceholderText("Верхний лимит")
         self.upper_limit_edit.setFixedWidth(100)
-        self.upper_limit_edit.setEnabled(False)
-        manual_layout.addWidget(self.upper_limit_edit)
         self.lower_limit_edit = QLineEdit()
         self.lower_limit_edit.setPlaceholderText("Нижний лимит")
         self.lower_limit_edit.setFixedWidth(100)
-        self.lower_limit_edit.setEnabled(False)
+        manual_layout.addWidget(self.upper_limit_edit)
         manual_layout.addWidget(self.lower_limit_edit)
-        manual_group.setLayout(manual_layout)
-        top_layout.addWidget(manual_group)
+        self.manual_group.setLayout(manual_layout)
+        self.manual_group.setVisible(False)
+        main_layout.addWidget(self.manual_group)
 
+        # Текущий выбор
+        self.current_label = QLabel("Текущая настройка: —")
+        self.current_label.setWordWrap(True)
+        main_layout.addWidget(self.current_label)
+
+        # Кнопки
         btn_layout = QHBoxLayout()
-        self.save_mapping_btn = QPushButton("Подтвердить")
-        self.save_mapping_btn.clicked.connect(self.save_current_mapping)
-        self.clear_selection_btn = QPushButton("Очистить выбор")
-        self.clear_selection_btn.clicked.connect(self.clear_selection)
-        btn_layout.addWidget(self.save_mapping_btn)
-        btn_layout.addWidget(self.clear_selection_btn)
-        top_layout.addLayout(btn_layout)
-        splitter.addWidget(top_widget)
+        self.save_btn = QPushButton("Подтвердить")
+        self.save_btn.clicked.connect(self.save_mapping)
+        self.clear_btn = QPushButton("Очистить выбор")
+        self.clear_btn.clicked.connect(self.clear_selection)
+        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(self.clear_btn)
+        main_layout.addLayout(btn_layout)
 
-        bottom_widget = QWidget()
-        bottom_layout = QVBoxLayout(bottom_widget)
-        bottom_layout.addWidget(QLabel("Сохранённые сопоставления:"))
+        # Список сопоставлений
+        main_layout.addWidget(QLabel("Сохранённые сопоставления:"))
         self.mapping_list = QListWidget()
         self.mapping_list.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.mapping_list.customContextMenuRequested.connect(self.show_mapping_context_menu)
-        bottom_layout.addWidget(self.mapping_list)
-        splitter.addWidget(bottom_widget)
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 1)
-        bottom_widget.setMaximumHeight(int(self.height() * 0.35))
+        self.mapping_list.customContextMenuRequested.connect(self.show_context_menu)
+        main_layout.addWidget(self.mapping_list)
 
-        main_layout.addWidget(splitter)
+        # Готово/Отмена
+        bottom_layout = QHBoxLayout()
+        done_btn = QPushButton("Готово")
+        done_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.clicked.connect(self.reject)
+        bottom_layout.addWidget(done_btn)
+        bottom_layout.addWidget(cancel_btn)
+        main_layout.addLayout(bottom_layout)
 
-        bottom_btn_layout = QHBoxLayout()
-        self.done_btn = QPushButton("Готово")
-        self.done_btn.clicked.connect(self.accept)
-        self.cancel_btn = QPushButton("Отмена")
-        self.cancel_btn.clicked.connect(self.reject)
-        bottom_btn_layout.addWidget(self.done_btn)
-        bottom_btn_layout.addWidget(self.cancel_btn)
-        main_layout.addLayout(bottom_btn_layout)
         self.setLayout(main_layout)
 
-    def accept(self):
-        duplicates = self.check_duplicates()
-        if duplicates:
-            QMessageBox.critical(self, "Ошибка дублирования", "\n".join(duplicates))
-            return
-        super().accept()
-
-    def check_duplicates(self):
-        errors = []
-        for i, mapping1 in enumerate(self.mappings):
-            if mapping1[-1] == "column":
-                limit1 = mapping1[0]
-                texts1 = set(mapping1[1])
-                for j, mapping2 in enumerate(self.mappings):
-                    if i >= j:
-                        continue
-                    if mapping2[-1] == "column":
-                        limit2 = mapping2[0]
-                        texts2 = set(mapping2[1])
-                        if limit1 == limit2:
-                            errors.append(
-                                f"Дублирование: лимитный столбец '{limit1}' используется в сопоставлениях {i + 1} и {j + 1}.")
-                        common = texts1.intersection(texts2)
-                        if common:
-                            errors.append(
-                                f"Дублирование: текстовые столбцы {', '.join(common)} используются в сопоставлениях {i + 1} и {j + 1}.")
-                    else:
-                        for (r, col) in mapping2[0]:
-                            header = self.headers[col]
-                            if header == limit1 or header in texts1:
-                                errors.append(
-                                    f"Дублирование: ячейка ({r},{header}) присутствует в сопоставлении {j + 1} (ячейки) и {i + 1} (столбцы).")
-            else:
-                cells1 = set(mapping1[0])
-                for j, mapping2 in enumerate(self.mappings):
-                    if i >= j:
-                        continue
-                    if mapping2[-1] == "cell":
-                        cells2 = set(mapping2[0])
-                        common = cells1.intersection(cells2)
-                        if common:
-                            errors.append(
-                                f"Дублирование: ячейки {common} присутствуют в сопоставлениях {i + 1} и {j + 1}.")
-                    else:
-                        for (r, col) in cells1:
-                            header = self.headers[col]
-                            if header == mapping2[0] or header in mapping2[1]:
-                                errors.append(
-                                    f"Дублирование: ячейка ({r},{header}) присутствует в сопоставлении {i + 1} (ячейки) и {j + 1} (столбцы).")
-        return errors
-
-    def toggle_manual_mode(self, state):
-        self.manual = (state == Qt.Checked)
-        if self.manual:
-            self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-            self.upper_limit_edit.setEnabled(True)
-            self.lower_limit_edit.setEnabled(True)
+    def switch_mode(self):
+        self.mode_auto = self.auto_radio.isChecked()
+        self.manual_group.setVisible(not self.mode_auto)
+        self.table.clearSelection()
+        self.current_limit_col = None
+        self.current_text_cols.clear()
+        self.manual_selected.clear()
+        if self.mode_auto:
+            self.header_view.setEnabled(True)
+            self.table.setSelectionMode(QTableView.NoSelection)
+            self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+            self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
+            self.table.setAutoScroll(False)  # В автомате отключаем (если надо)
         else:
-            self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.NoEditSelection)
-            self.upper_limit_edit.setEnabled(False)
-            self.lower_limit_edit.setEnabled(False)
-            self.clear_selection()
-        self.update_current_mapping_label()
+            self.header_view.setEnabled(False)
+            self.table.setSelectionMode(QTableView.ExtendedSelection)
+            self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+            self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+            self.table.setAutoScroll(True)  # В ручном — обязательно включено!
+        self.update_colors()
+        self.update_label()
 
     def handle_drag_selection(self, selection: set):
-        if self.manual:
+        if not self.mode_auto:
             return
-        if self.current_limit is None:
-            if len(selection) == 1:
-                self.current_limit = next(iter(selection))
-        else:
+        if self.current_limit_col is None and len(selection) == 1:
+            self.current_limit_col = next(iter(selection))
+            self.current_text_cols.clear()
+        elif self.current_limit_col is not None:
             sel = set(selection)
-            if self.current_limit in sel:
-                sel.remove(self.current_limit)
-            self.current_texts = sel
-        self.update_header_colors()
-        self.update_current_mapping_label()
+            if self.current_limit_col in sel:
+                sel.remove(self.current_limit_col)
+            self.current_text_cols = sel
+        self.update_colors()
+        self.update_label()
 
-    def update_header_colors(self):
+    def on_selection_changed(self):
+        if self.mode_auto:
+            return
+        self.manual_selected = set(
+            (index.row(), index.column())
+            for index in self.table.selectionModel().selectedIndexes()
+        )
+        self.update_colors()
+        self.update_label()
+
+    def update_colors(self):
         for row in range(self.model.rowCount()):
             for col in range(self.model.columnCount()):
-                index = self.model.index(row, col)
-                self.model.setData(index, QBrush(QColor("white")), role=Qt.BackgroundRole)
-        for mapping in self.mappings:
-            if mapping[-1] == "column":
-                try:
-                    idx_limit = self.headers.index(mapping[0])
-                except ValueError:
-                    continue
+                idx = self.model.index(row, col)
+                self.model.setData(idx, QBrush(QColor("white")), Qt.BackgroundRole)
+        for row, col in self.saved_manual_cells:
+            idx = self.model.index(row, col)
+            self.model.setData(idx, QBrush(QColor("#ffe5b4")), Qt.BackgroundRole)
+        if self.mode_auto:
+            if self.current_limit_col is not None:
                 for row in range(self.model.rowCount()):
-                    index = self.model.index(row, idx_limit)
-                    self.model.setData(index, QBrush(QColor("lightblue")), role=Qt.BackgroundRole)
-                for text in mapping[1]:
-                    try:
-                        idx_text = self.headers.index(text)
-                    except ValueError:
-                        continue
-                    for row in range(self.model.rowCount()):
-                        index = self.model.index(row, idx_text)
-                        self.model.setData(index, QBrush(QColor("lightgreen")), role=Qt.BackgroundRole)
-            else:
-                for (sheet_row, col) in mapping[0]:
-                    model_row = sheet_row - 2
-                    if 0 <= model_row < self.model.rowCount() and 0 <= col < self.model.columnCount():
-                        index = self.model.index(model_row, col)
-                        self.model.setData(index, QBrush(QColor("lightgreen")), role=Qt.BackgroundRole)
-        if not self.manual:
-            if self.current_limit is not None:
+                    idx = self.model.index(row, self.current_limit_col)
+                    self.model.setData(idx, QBrush(QColor("#a2cffe")), Qt.BackgroundRole)
+            for col in self.current_text_cols:
                 for row in range(self.model.rowCount()):
-                    index = self.model.index(row, self.current_limit)
-                    current_brush = self.model.data(index, role=Qt.BackgroundRole)
-                    if not current_brush or current_brush.color().name() == "#ffffff":
-                        self.model.setData(index, QBrush(QColor("lightblue")), role=Qt.BackgroundRole)
-            for col in self.current_texts:
-                for row in range(self.model.rowCount()):
-                    index = self.model.index(row, col)
-                    current_brush = self.model.data(index, role=Qt.BackgroundRole)
-                    if not current_brush or current_brush.color().name() == "#ffffff":
-                        self.model.setData(index, QBrush(QColor("lightgreen")), role=Qt.BackgroundRole)
+                    idx = self.model.index(row, col)
+                    self.model.setData(idx, QBrush(QColor("#b6fcb6")), Qt.BackgroundRole)
         else:
-            pass
+            for row, col in self.manual_selected:
+                idx = self.model.index(row, col)
+                self.model.setData(idx, QBrush(QColor("#b6fcb6")), Qt.BackgroundRole)
 
-    def update_current_mapping_label(self):
-        if self.manual:
-            indexes = self.table_view.selectionModel().selectedIndexes()
-            if indexes:
-                cells = [f"({index.row() + 2},{self.headers[index.column()]})" for index in
-                         sorted(indexes, key=lambda x: (x.row(), x.column()))]
-                mapping_str = f"Выбрано ячеек: {', '.join(cells)}"
+    def update_label(self):
+        if self.mode_auto:
+            if self.current_limit_col is None:
+                txt = "Лимит: —; Тексты: —"
             else:
-                mapping_str = "Не выбрано"
+                lim = self.headers[self.current_limit_col]
+                texts = [self.headers[c] for c in sorted(self.current_text_cols)] if self.current_text_cols else ['—']
+                txt = f"Лимит: {lim}; Тексты: {', '.join(texts)}"
         else:
-            if self.current_limit is not None:
-                limit_text = self.headers[self.current_limit]
+            if not self.manual_selected:
+                txt = "Ячеек выбрано: —"
             else:
-                limit_text = "Не выбрано"
-            text_list = [self.headers[i] for i in sorted(self.current_texts)]
-            mapping_str = f"Лимит: {limit_text}; Тексты: {', '.join(text_list) if text_list else 'Не выбрано'}"
-        if self.manual:
-            upper = self.upper_limit_edit.text()
-            lower = self.lower_limit_edit.text()
-            mapping_str += f"; Верхний: {upper if upper else '—'}; Нижний: {lower if lower else '—'}"
-        self.current_mapping_label.setText("Текущая настройка: " + mapping_str)
+                cells = [f"({r + 2}, {self.headers[c]})" for r, c in sorted(self.manual_selected)]
+                up = self.upper_limit_edit.text() or '—'
+                low = self.lower_limit_edit.text() or '—'
+                txt = f"Ячейки: {', '.join(cells)}; Верхний: {up}; Нижний: {low}"
+        self.current_label.setText(f"Текущая настройка: {txt}")
 
     def clear_selection(self):
-        self.table_view.clearSelection()
-        if not self.manual:
-            self.current_limit = None
-            self.current_texts.clear()
-        if not self.manual:
-            self.manual_checkbox.setChecked(False)
+        self.table.clearSelection()
+        self.current_limit_col = None
+        self.current_text_cols.clear()
+        self.manual_selected.clear()
         self.upper_limit_edit.clear()
         self.lower_limit_edit.clear()
-        self.update_header_colors()
-        self.update_current_mapping_label()
+        self.update_colors()
+        self.update_label()
 
-    def save_current_mapping(self):
-        manual = self.manual
-        if not manual:
-            if self.current_limit is None or not self.current_texts:
-                QMessageBox.critical(self, "Ошибка", "Выберите столбец с лимитом и хотя бы один столбец с текстом.")
+    def save_mapping(self):
+        if self.mode_auto:
+            if self.current_limit_col is None or not self.current_text_cols:
+                QMessageBox.critical(self, "Ошибка", "Выберите лимитный столбец и хотя бы одну колонку с текстом.")
                 return
             mapping = (
-                self.headers[self.current_limit], [self.headers[i] for i in sorted(self.current_texts)],
-                False, None, None, "column")
+                self.headers[self.current_limit_col],
+                [self.headers[c] for c in sorted(self.current_text_cols)],
+                False,
+                None,
+                None,
+                "column"
+            )
+            txt = f"Лимит: {mapping[0]} -> {', '.join(mapping[1])}"
         else:
-            indexes = self.table_view.selectionModel().selectedIndexes()
-            if not indexes:
-                QMessageBox.critical(self, "Ошибка", "Выберите диапазон ячеек для проверки.")
+            if not self.manual_selected:
+                QMessageBox.critical(self, "Ошибка", "Выделите ячейки для проверки.")
                 return
-            cells = set((index.row() + 2, index.column()) for index in indexes)
             upper = _get_int_value(self.upper_limit_edit.text())
             lower = _get_int_value(self.lower_limit_edit.text())
-            mapping = (list(cells), True, upper, lower, "cell")
+            mapping = (
+                list(self.manual_selected),
+                True,
+                upper,
+                lower,
+                "cell"
+            )
+            cells = ', '.join([f"({r + 2},{self.headers[c]})" for r, c in mapping[0]])
+            txt = f"Ячейки: {cells}; Верхний={upper if upper is not None else '—'}, Нижний={lower if lower is not None else '—'}"
+            self.saved_manual_cells.update(self.manual_selected)
         self.mappings.append(mapping)
-        if mapping[-1] == "column":
-            mapping_str = f"Лимит: {mapping[0]} -> Тексты: {', '.join(mapping[1])}"
-        else:
-            cells_str = ", ".join([f"({r},{self.headers[c]})" for (r, c) in mapping[0]])
-            mapping_str = f"Ячейки: {cells_str}"
-        if mapping[1] is True or mapping[-1] == "cell":
-            mapping_str += f" (Вручную: верхний={mapping[2] if mapping[2] is not None else '—'}, нижний={mapping[3] if mapping[3] is not None else '—'})"
-        self.mapping_list.addItem(mapping_str)
+        self.mapping_list.addItem(txt)
         self.clear_selection()
 
-    def show_mapping_context_menu(self, pos):
+    def show_context_menu(self, pos):
         item = self.mapping_list.itemAt(pos)
         if item:
             menu = QMenu()
             delete_action = menu.addAction("Удалить")
-            edit_action = menu.addAction("Редактировать")
             action = menu.exec(self.mapping_list.mapToGlobal(pos))
             row = self.mapping_list.row(item)
             if action == delete_action:
                 self.mapping_list.takeItem(row)
                 if 0 <= row < len(self.mappings):
                     del self.mappings[row]
-            elif action == edit_action:
-                if 0 <= row < len(self.mappings):
-                    mapping = self.mappings.pop(row)
-                    self.mapping_list.takeItem(row)
-                    if mapping[-1] == "column":
-                        idx_limit = self.headers.index(mapping[0])
-                        idx_texts = [self.headers.index(t) for t in mapping[1]]
-                        self.current_limit = idx_limit
-                        self.current_texts = set(idx_texts)
-                        self.manual_checkbox.setChecked(False)
-                        self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
-                        self.table_view.horizontalHeader().show()
-                    else:
-                        self.manual_checkbox.setChecked(True)
-                        self.table_view.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-                    if mapping[-1] == "cell":
-                        if mapping[2] is not None:
-                            self.upper_limit_edit.setText(str(mapping[2]))
-                        if mapping[3] is not None:
-                            self.lower_limit_edit.setText(str(mapping[3]))
-                    self.update_header_colors()
-                    self.update_current_mapping_label()
+                # Оставляем saved_manual_cells (оранжевое), иначе уйдёт покраска прошлых подтверждений
 
     def get_mappings(self):
         return self.mappings
 
-    def accept(self):
-        duplicates = self.check_duplicates()
-        if duplicates:
-            QMessageBox.critical(self, "Ошибка дублирования", "\n".join(duplicates))
-            return
-        super().accept()
-
-# ==================== LimitsChecker ====================
+# --- LIMITS CHECKER MAIN ---
 class LimitsChecker(QWidget):
     def __init__(self):
         super().__init__()
@@ -397,8 +362,6 @@ class LimitsChecker(QWidget):
 
         self.file_page = FileSelectionPage()
         self.stack.addWidget(self.file_page)
-
-        # Сигналы стартового экрана
         self.file_page.file_selected.connect(self.update_sheet_list)
         self.file_page.mapping_clicked.connect(self.open_mapping_dialog)
         self.file_page.next_clicked.connect(self.goto_results_page)
@@ -435,8 +398,8 @@ class LimitsChecker(QWidget):
             items = [QStandardItem(str(cell)) if cell is not None else QStandardItem("")
                      for cell in row]
             model.appendRow(items)
-        dialog = LimitsMappingPreviewDialog(model, self.headers, self)
-        if dialog.exec() == QtWidgets.QDialog.Accepted:
+        dialog = MappingDialog(model, self.headers, self)
+        if dialog.exec() == QDialog.Accepted:
             self.mappings = dialog.get_mappings()
 
     def goto_results_page(self):
@@ -449,43 +412,21 @@ class LimitsChecker(QWidget):
         if not self.mappings:
             QMessageBox.critical(self, "Ошибка", "Не заданы сопоставления лимитов.")
             return
-        # ----- Весь авто-режим вынесен в отдельный модуль -----
         report_lines = []
         total_violations = 0
+
         try:
-            report_lines, total_violations = check_limits_auto(self.sheet, self.headers, self.mappings)
+            auto_lines, auto_violations = check_limits_auto(self.sheet, self.headers, self.mappings)
+            report_lines.extend(auto_lines)
+            total_violations += auto_violations
         except ValueError as e:
             QMessageBox.critical(self, "Ошибка", str(e))
             return
-        # ----- Ручной режим как был -----
-        for m in self.mappings:
-            if m[-1] == "cell":
-                selected_cells, manual, upper, lower, _ = m
-                current_limit = _get_int_value(upper)
-                current_lower = _get_int_value(lower)
-                for (model_row, col) in selected_cells:
-                    sheet_row = model_row
-                    cell_obj = self.sheet.cell(row=sheet_row, column=col + 1)
-                    cell_text = cell_obj.value
-                    if cell_text is None:
-                        continue
-                    text_str = str(cell_text)
-                    text_length = len(text_str)
-                    violation = False
-                    detail = ""
-                    if current_limit is not None and text_length > current_limit:
-                        violation = True
-                        detail += f"длина = {text_length} (лимит {current_limit})"
-                        fill = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
-                    elif current_lower is not None and text_length < current_lower:
-                        violation = True
-                        detail += f"длина = {text_length} (нижний лимит {current_lower})"
-                        fill = PatternFill(start_color="FFD699", end_color="FFD699", fill_type="solid")
-                    if violation:
-                        cell_obj.fill = fill
-                        total_violations += 1
-                        header = self.headers[col]
-                        report_lines.append(f"Строка {sheet_row}, столбец '{header}': {detail}")
+
+        manual_lines, manual_violations = check_limits_manual(self.sheet, self.headers, self.mappings)
+        report_lines.extend(manual_lines)
+        total_violations += manual_violations
+
         base, ext = os.path.splitext(self.selected_file)
         output_file = f"{base}_checked{ext}"
         try:
@@ -530,7 +471,7 @@ class LimitsChecker(QWidget):
         self.stack.setCurrentWidget(self.file_page)
 
 if __name__ == '__main__':
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     window = LimitsChecker()
     window.show()
     sys.exit(app.exec())
