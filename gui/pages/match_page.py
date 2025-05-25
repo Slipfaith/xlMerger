@@ -169,6 +169,24 @@ class MatchPage(QWidget):
             return base
         return f"{base[:n]}...{base[-n:]}"
 
+
+    def apply_mapping(self, file_to_column=None, folder_to_column=None):
+        """Применяет подгруженные маппинги к комбобоксам"""
+        if file_to_column and hasattr(self, 'file_to_column_widgets'):
+            for k, combo in self.file_to_column_widgets.items():
+                val = file_to_column.get(k)
+                if val is not None:
+                    idx = combo.findText(val)
+                    if idx != -1:
+                        combo.setCurrentIndex(idx)
+        if folder_to_column and hasattr(self, 'folder_to_column_widgets'):
+            for k, combo in self.folder_to_column_widgets.items():
+                val = folder_to_column.get(k)
+                if val is not None:
+                    idx = combo.findText(val)
+                    if idx != -1:
+                        combo.setCurrentIndex(idx)
+
     def _on_next(self):
         file_to_column = {}
         folder_to_column = {}

@@ -288,10 +288,18 @@ class FileProcessorApp(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при загрузке настроек: {e}")
 
     def apply_loaded_mapping(self, mapping):
-        if hasattr(self, 'file_to_column') and self.file_to_column:
-            self.apply_mapping_to_comboboxes(mapping, self.file_to_column)
-        else:
-            self.apply_mapping_to_comboboxes(mapping, self.folder_to_column)
+        # Определяем: файл это или папка
+        file_to_column = {}
+        folder_to_column = {}
+        # Учитываем, что в mapping ключ может быть файлом или папкой
+        for k, v in mapping.items():
+            if os.path.isfile(k) or (self.selected_files and k in self.selected_files):
+                file_to_column[k] = v
+            else:
+                folder_to_column[k] = v
+        # если мы на странице сопоставления - сразу применяем
+        if hasattr(self, "page_match") and self.page_match:
+            self.page_match.apply_mapping(file_to_column, folder_to_column)
 
     def apply_mapping_to_comboboxes(self, mapping, combobox_dict):
         for name, column_name in mapping.items():
