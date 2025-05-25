@@ -1,8 +1,8 @@
 # gui/main_page.py
-import os
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QRadioButton,
-    QListWidget, QListWidgetItem, QLineEdit
+    QListWidget, QLineEdit
 )
 from PySide6.QtCore import Qt, Signal
 

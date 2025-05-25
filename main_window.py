@@ -28,7 +28,6 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
 
         file_menu = menubar.addMenu(self.tr("File"))
-        settings_menu = menubar.addMenu(self.tr("Settings"))
         help_menu = menubar.addMenu(self.tr("Help"))
 
         exit_action = QAction(self.tr("Exit"), self)

@@ -3,10 +3,10 @@ import json
 import traceback
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QStackedWidget, QMessageBox,
-    QProgressBar, QScrollArea, QFrame, QHBoxLayout, QGridLayout, QLabel,
-    QPushButton, QComboBox, QLineEdit, QFileDialog
+    QHBoxLayout, QLabel,
+    QPushButton, QFileDialog
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 
 from gui.main_page import MainPageWidget
 from gui.pages.sheet_column_page import SheetColumnPage

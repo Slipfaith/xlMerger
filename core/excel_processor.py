@@ -78,7 +78,6 @@ class ExcelProcessor:
         progress = 0
 
         for sheet_name in self.selected_sheets:
-            sheet = self.workbook[sheet_name]
             copy_col_index = utils.column_index_from_string(self.sheet_to_column[sheet_name])
             header_row = self.header_row[sheet_name]
 

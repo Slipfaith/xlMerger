@@ -10,7 +10,6 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
 
 from core.drag_drop import DragDropLineEdit
-from gui.limit_check.limit_check_file_page import FileSelectionPage
 from core.limit_auto import check_limits_auto
 from core.limit_manual import check_limits_manual
 

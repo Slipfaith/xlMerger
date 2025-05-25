@@ -1,6 +1,6 @@
 import os
 from PySide6.QtWidgets import QLineEdit, QFileDialog
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal
 
 class DragDropLineEdit(QLineEdit):
     filesSelected = Signal(list)       # Для поля "Папка переводов" (эксели)

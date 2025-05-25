@@ -1,7 +1,7 @@
 import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QHBoxLayout, QMessageBox, QListView
+    QMessageBox, QListView
 )
 from PySide6.QtCore import Qt
 

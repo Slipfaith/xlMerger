@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QComboBox,
-    QPushButton, QHBoxLayout, QSpacerItem, QSizePolicy
+    QPushButton, QHBoxLayout, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
 

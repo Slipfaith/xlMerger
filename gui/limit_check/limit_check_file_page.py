@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox,
-    QLabel, QPushButton
+    QPushButton
 )
 from PySide6.QtCore import Signal
 from core.drag_drop import DragDropLineEdit

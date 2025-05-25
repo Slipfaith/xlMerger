@@ -1,8 +1,8 @@
 # gui/pages/progress_page.py
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QHBoxLayout
-from PySide6.QtCore import Qt, QTimer, QEasingCurve, Property
-from PySide6.QtGui import QFont, QMovie
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont
 
 class ProgressPage(QWidget):
     def __init__(self, parent=None):
