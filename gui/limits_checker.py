@@ -93,7 +93,7 @@ class FileSelectionPage(QWidget):
     def current_sheet(self):
         return self._current_sheet
 
-# --- МAPPING DIALOG ---
+# --- MAPPING DIALOG ---
 class MappingDialog(QDialog):
     def __init__(self, model: QStandardItemModel, headers: list, parent=None):
         super().__init__(parent)
@@ -107,7 +107,8 @@ class MappingDialog(QDialog):
         self.current_limit_col = None
         self.current_text_cols = set()
         self.manual_selected = set()
-        self.saved_manual_cells = set()  # Для окраски подтверждённых вручную ячеек
+        self.saved_manual_cells = set()
+        self.saved_auto_cells = set()
         self.init_ui()
 
     def init_ui(self):
@@ -128,6 +129,7 @@ class MappingDialog(QDialog):
             "Автоматический: выбери столбец лимитов (синий), затем перетяни мышкой по заголовкам — выделишь текстовые столбцы (зелёный).\n"
             "Ручной: выдели любые ячейки мышкой, введи лимиты вручную."
         )
+        self.info_label.setWordWrap(True)
         main_layout.addWidget(self.info_label)
 
         # Таблица предпросмотра
@@ -140,11 +142,6 @@ class MappingDialog(QDialog):
         self.table.setHorizontalHeader(self.header_view)
         self.header_view.dragSelectionChanged.connect(self.handle_drag_selection)
         self.table.selectionModel().selectionChanged.connect(self.on_selection_changed)
-
-        # Настройки для избежания drag-resize в ручном режиме:
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
-
         main_layout.addWidget(self.table)
 
         # Поля лимитов (только для ручного режима)
@@ -206,15 +203,15 @@ class MappingDialog(QDialog):
         if self.mode_auto:
             self.header_view.setEnabled(True)
             self.table.setSelectionMode(QTableView.NoSelection)
+            self.table.setAutoScroll(False)
             self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
             self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
-            self.table.setAutoScroll(False)  # В автомате отключаем (если надо)
         else:
             self.header_view.setEnabled(False)
             self.table.setSelectionMode(QTableView.ExtendedSelection)
+            self.table.setAutoScroll(True)
             self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
             self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-            self.table.setAutoScroll(True)  # В ручном — обязательно включено!
         self.update_colors()
         self.update_label()
 
@@ -243,13 +240,19 @@ class MappingDialog(QDialog):
         self.update_label()
 
     def update_colors(self):
+        # Сброс всех цветов
         for row in range(self.model.rowCount()):
             for col in range(self.model.columnCount()):
                 idx = self.model.index(row, col)
                 self.model.setData(idx, QBrush(QColor("white")), Qt.BackgroundRole)
+        # Оранжевый — уже подтверждённые (ручные и авто)
         for row, col in self.saved_manual_cells:
             idx = self.model.index(row, col)
             self.model.setData(idx, QBrush(QColor("#ffe5b4")), Qt.BackgroundRole)
+        for row, col in self.saved_auto_cells:
+            idx = self.model.index(row, col)
+            self.model.setData(idx, QBrush(QColor("#ffe5b4")), Qt.BackgroundRole)
+        # Выделение текущего выбора
         if self.mode_auto:
             if self.current_limit_col is not None:
                 for row in range(self.model.rowCount()):
@@ -306,6 +309,11 @@ class MappingDialog(QDialog):
                 "column"
             )
             txt = f"Лимит: {mapping[0]} -> {', '.join(mapping[1])}"
+            # --- Оранжевое выделение подтверждённых ячеек (лимит + тексты)
+            for row in range(self.model.rowCount()):
+                self.saved_auto_cells.add((row, self.current_limit_col))
+                for col in self.current_text_cols:
+                    self.saved_auto_cells.add((row, col))
         else:
             if not self.manual_selected:
                 QMessageBox.critical(self, "Ошибка", "Выделите ячейки для проверки.")
@@ -337,7 +345,7 @@ class MappingDialog(QDialog):
                 self.mapping_list.takeItem(row)
                 if 0 <= row < len(self.mappings):
                     del self.mappings[row]
-                # Оставляем saved_manual_cells (оранжевое), иначе уйдёт покраска прошлых подтверждений
+                # Оставляем saved_manual_cells/saved_auto_cells — чтобы покраска оставалась
 
     def get_mappings(self):
         return self.mappings
