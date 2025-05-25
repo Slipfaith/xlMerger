@@ -46,19 +46,19 @@ class ExcelProcessor:
 
     def validate_paths_and_column(self):
         if self.folder_path and not os.path.isdir(self.folder_path):
-            self.logger.log_error("Папка перевода не найдена", self.folder_path)
+            self.logger.log_error("Папка перевода не найдена", "", "", self.folder_path)
             raise FileNotFoundError("Указанная папка не существует.")
         if not os.path.exists(self.main_excel_path):
-            self.logger.log_error("Файл Excel не найден", self.main_excel_path)
+            self.logger.log_error("Файл Excel не найден", "", "", self.main_excel_path)
             raise FileNotFoundError("Указанный файл Excel не существует.")
         if not self.copy_column:
-            self.logger.log_error("Не указан столбец для копирования", "")
+            self.logger.log_error("Не указан столбец для копирования", "", "", "")
             raise ValueError("Укажите столбец для копирования.")
 
     def copy_data(self, progress_callback=None):
         self.validate_paths_and_column()
         if not self.selected_sheets:
-            self.logger.log_error("Не выбраны листы", "")
+            self.logger.log_error("Не выбраны листы", "", "", "")
             raise ValueError("Выберите хотя бы один лист.")
 
         self.workbook = load_workbook(self.main_excel_path)
@@ -86,7 +86,7 @@ class ExcelProcessor:
                 if not column_name:
                     continue
                 if column_name not in self.columns[sheet_name]:
-                    self.logger.log_error(f"Столбец '{column_name}' не найден на листе '{sheet_name}'", name)
+                    self.logger.log_error(f"Столбец '{column_name}' не найден на листе '{sheet_name}'", "", "", name)
                     raise Exception(
                         f"Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel."
                     )
@@ -123,7 +123,7 @@ class ExcelProcessor:
             return lang_wb.sheetnames[0]
         else:
             sheets = ', '.join(lang_wb.sheetnames)
-            self.logger.log_error(f"Не найден лист '{main_sheet_name}'", sheets)
+            self.logger.log_error(f"Не найден лист '{main_sheet_name}'", "", "", sheets)
             raise Exception(
                 f"Не найден лист '{main_sheet_name}' в файле перевода. "
                 f"В файле листы: {sheets}. "
@@ -179,4 +179,4 @@ class ExcelProcessor:
         else:
             fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
             target_cell.fill = fill
-            self.logger.log_error(f"Не удалось записать значение после {max_attempts} попыток", f"{sheet_name}: R{target_row} C{col_index} [{value}]")
+            self.logger.log_error(f"Не удалось записать значение после {max_attempts} попыток", "", "", f"{sheet_name}: R{target_row} C{col_index} [{value}]")

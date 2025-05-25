@@ -1,5 +1,14 @@
+import logging
 import datetime
 import os
+
+logger = logging.getLogger("app_logger")
+logger.setLevel(logging.DEBUG)
+if not logger.hasHandlers():
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 class Logger:
     def __init__(self, log_file="copy_log.txt"):
@@ -10,6 +19,7 @@ class Logger:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         entry = f"[{timestamp}] {message}"
         self.entries.append(entry)
+        logger.error(message)  # <-- вот здесь дублируем в стандартный логгер
 
     def log_copy(self, sheet, row, col, value):
         msg = f"COPY: {sheet} R{row}C{col} -> {repr(value)}"
