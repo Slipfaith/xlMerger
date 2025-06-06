@@ -3,11 +3,13 @@ from PySide6.QtGui import QAction
 
 from gui.file_processor_app import FileProcessorApp
 from gui.limits_checker import LimitsChecker
+from PySide6.QtGui import QIcon
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(self.tr("xlMerger: объединяй и проверяй"))
+        self.setWindowIcon(QIcon(r"C:\Users\yanismik\Desktop\PythonProject1\xlM_2.0\xlM2.0.ico"))  # <- иконка здесь
         self.init_menu()
 
         # Создаем QTabWidget и добавляем вкладки
@@ -39,4 +41,4 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def show_about(self):
-        QMessageBox.information(self, self.tr("About"), self.tr("Объединяй и проверяй\nVersion 2 25.05.2025"))
+        QMessageBox.information(self, self.tr("About"), self.tr("Объединяй и проверяй\nVersion 2 25.05.2025\nslipfaith"))

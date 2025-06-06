@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog
 )
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QIcon
 
 from gui.main_page import MainPageWidget
 from gui.pages.sheet_column_page import SheetColumnPage
@@ -15,7 +16,7 @@ from gui.pages.confirm_page import ConfirmPage
 from gui.pages.progress_page import ProgressPage
 from core.main_page_logic import MainPageLogic
 from core.excel_processor import ExcelProcessor
-from gui.pages.header_row_page import HeaderRowPage  # подключаем новую страницу
+from gui.pages.header_row_page import HeaderRowPage
 
 def short_name_no_ext(name, n=5):
     base, ext = os.path.splitext(name)
@@ -30,6 +31,7 @@ class FileProcessorApp(QWidget):
     def __init__(self):
         super().__init__()
         self.stack = QStackedWidget(self)
+        self.setWindowIcon(QIcon(r"C:\Users\yanismik\Desktop\PythonProject1\xlM_2.0\xlM2.0.ico"))
         # --- Главная страница и логика ---
         self.page_main = MainPageWidget()
         self.main_page_logic = MainPageLogic(self.page_main)

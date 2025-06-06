@@ -72,7 +72,7 @@ class FileSelectionPage(QWidget):
         layout.addWidget(self.file_input)
         self.sheet_label = QLabel("Лист: (не выбран)")
         layout.addWidget(self.sheet_label)
-        self.mapping_btn = QPushButton("Сопоставить лимиты")
+        self.mapping_btn = QPushButton("Проверить лимиты")
         self.mapping_btn.clicked.connect(self.mapping_clicked.emit)
         layout.addWidget(self.mapping_btn)
         self.next_btn = QPushButton("Далее")
