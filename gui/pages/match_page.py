@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QPushButton, QHBoxLayout
 )
 from PySide6.QtCore import Signal, Qt
+from utils.i18n import tr, i18n
 
 
 class MatchPage(QWidget):
@@ -22,7 +23,7 @@ class MatchPage(QWidget):
             folder_to_column=None
     ):
         super().__init__()
-        self.setWindowTitle("Сопоставление")
+        self.setWindowTitle(tr("Сопоставление"))
         self.folder_path = folder_path
         self.selected_files = [os.path.abspath(f) for f in (selected_files or [])]
         self.selected_sheets = selected_sheets
@@ -41,6 +42,8 @@ class MatchPage(QWidget):
         self._build_layout()
         # Применяем маппинг после построения интерфейса
         self.apply_mapping(self.file_to_column, self.folder_to_column)
+        i18n.language_changed.connect(self.retranslate_ui)
+        self.retranslate_ui()
 
     def _init_files_and_folders(self):
         excel_exts = ('.xlsx', '.xls')
@@ -69,8 +72,9 @@ class MatchPage(QWidget):
 
     def _build_layout(self):
         layout = QVBoxLayout()
-        label = "Сопоставь имена файлов с колонками:" if self._is_files else "Сопоставь папки с колонками:"
-        layout.addWidget(QLabel(label))
+        label_text = "Сопоставь имена файлов с колонками:" if self._is_files else "Сопоставь папки с колонками:"
+        self.top_label = QLabel(label_text)
+        layout.addWidget(self.top_label)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -134,18 +138,18 @@ class MatchPage(QWidget):
         layout.addWidget(scroll_area)
 
         button_layout = QHBoxLayout()
-        save_button = QPushButton("Сохранить настройки")
-        load_button = QPushButton("Загрузить настройки")
-        back_button = QPushButton("Назад")
-        next_button = QPushButton("Далее")
-        save_button.clicked.connect(self.saveClicked.emit)
-        load_button.clicked.connect(self.loadClicked.emit)
-        back_button.clicked.connect(self.backClicked.emit)
-        next_button.clicked.connect(self._on_next)
-        button_layout.addWidget(save_button)
-        button_layout.addWidget(load_button)
-        button_layout.addWidget(back_button)
-        button_layout.addWidget(next_button)
+        self.save_button = QPushButton(tr("Сохранить настройки"))
+        self.load_button = QPushButton(tr("Загрузить настройки"))
+        self.back_button = QPushButton(tr("Назад"))
+        self.next_button = QPushButton(tr("Далее"))
+        self.save_button.clicked.connect(self.saveClicked.emit)
+        self.load_button.clicked.connect(self.loadClicked.emit)
+        self.back_button.clicked.connect(self.backClicked.emit)
+        self.next_button.clicked.connect(self._on_next)
+        button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.load_button)
+        button_layout.addWidget(self.back_button)
+        button_layout.addWidget(self.next_button)
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
@@ -261,3 +265,12 @@ class MatchPage(QWidget):
             for k, v in self.folder_to_column_widgets.items():
                 folder_to_column[k] = v.currentText()
         self.nextClicked.emit(file_to_column, folder_to_column)
+
+    def retranslate_ui(self):
+        self.setWindowTitle(tr("Сопоставление"))
+        label_text = tr("Сопоставь имена файлов с колонками:") if self._is_files else tr("Сопоставь папки с колонками:")
+        self.top_label.setText(label_text)
+        self.save_button.setText(tr("Сохранить настройки"))
+        self.load_button.setText(tr("Загрузить настройки"))
+        self.back_button.setText(tr("Назад"))
+        self.next_button.setText(tr("Далее"))

@@ -6,8 +6,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel,
     QPushButton, QFileDialog
 )
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QIcon
+from utils.i18n import tr, i18n
 
 from gui.main_page import MainPageWidget
 from gui.pages.sheet_column_page import SheetColumnPage
@@ -54,13 +55,19 @@ class FileProcessorApp(QWidget):
         self.copy_by_row_number = False
         self.progress_bar = None
 
-        self.setWindowTitle("Обработка файлов")
+        self.settings = QSettings('xlMerger', 'xlMerger')
+        self.last_mapping_path = self.settings.value('mapping_path', '')
+
+        i18n.language_changed.connect(self.retranslate_ui)
+        
+        self.setWindowTitle(tr("Обработка файлов"))
         layout = QVBoxLayout()
         layout.addWidget(self.stack)
         self.setLayout(layout)
         self.setGeometry(300, 300, 600, 400)
         self.center_window()
         self.show()
+        self.retranslate_ui()
 
     def process_files(self):
         self.selected_files = self.main_page_logic.selected_files
@@ -72,7 +79,7 @@ class FileProcessorApp(QWidget):
         self.copy_by_row_number = self.page_main.copy_by_row_number_radio.isChecked()
 
         if not self.copy_column:
-            QMessageBox.warning(self, "Ошибка", "Укажи столбец для копирования.")
+            QMessageBox.warning(self, tr("Error"), tr("Укажи столбец для копирования."))
             return  # НЕ переходим дальше
 
         self.go_to_header_page()
@@ -104,7 +111,7 @@ class FileProcessorApp(QWidget):
             self.go_to_sheet_column_page()
         except Exception as e:
             self.log_error(e)
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при загрузке столбцов: {e}")
+            QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при загрузке столбцов: {e}").format(e=e))
 
     def go_to_sheet_column_page(self):
         self.page_sheet_column = SheetColumnPage(self.selected_sheets, self.copy_column)
@@ -198,15 +205,20 @@ class FileProcessorApp(QWidget):
                 mapping = {}  # ничего не сохранять если не на этой странице
 
             settings_path, _ = QFileDialog.getSaveFileName(
-                self, "Сохранить настройки", '', "JSON файлы (*.json)"
+                self,
+                tr("Сохранить настройки"),
+                self.last_mapping_path,
+                tr("JSON файлы (*.json)")
             )
             if settings_path:
                 with open(settings_path, 'w', encoding='utf-8') as f:
                     json.dump(mapping, f, ensure_ascii=False, indent=2)
-                QMessageBox.information(self, "Успех", "Настройки успешно сохранены.")
+                self.last_mapping_path = settings_path
+                self.settings.setValue('mapping_path', settings_path)
+                QMessageBox.information(self, tr("Success"), tr("Настройки успешно сохранены."))
         except Exception as e:
             self.log_error(e)
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении настроек: {e}")
+            QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при сохранении настроек: {e}").format(e=e))
 
     def get_current_mapping(self):
         if hasattr(self, 'file_to_column') and self.file_to_column:
@@ -216,15 +228,22 @@ class FileProcessorApp(QWidget):
 
     def load_mapping_settings(self):
         try:
-            settings_path, _ = QFileDialog.getOpenFileName(self, "Загрузить настройки", '', "JSON файлы (*.json)")
+            settings_path, _ = QFileDialog.getOpenFileName(
+                self,
+                tr("Загрузить настройки"),
+                self.last_mapping_path,
+                tr("JSON файлы (*.json)")
+            )
             if settings_path:
                 with open(settings_path, 'r', encoding='utf-8') as f:
                     mapping = json.load(f)
                 # вот тут!
                 self.page_match.apply_mapping(mapping, mapping)
+                self.last_mapping_path = settings_path
+                self.settings.setValue('mapping_path', settings_path)
         except Exception as e:
             self.log_error(e)
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при загрузке настроек: {e}")
+            QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при загрузке настроек: {e}").format(e=e))
 
     def apply_loaded_mapping(self, mapping):
         # Определяем: файл это или папка
@@ -279,11 +298,11 @@ class FileProcessorApp(QWidget):
 
         except Exception as e:
             self.log_error(e)
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при запуске процесса копирования: {e}")
+            QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при запуске процесса копирования: {e}").format(e=e))
 
     def finalize_copying_process(self, output_file):
         self.go_to_completion_page()
-        QMessageBox.information(self, "Готово", f"Файлы успешно сохранены как {output_file}.")
+        QMessageBox.information(self, tr("Success"), tr("Файлы успешно сохранены как {output_file}.").format(output_file=output_file))
 
     # === Error Logging & Center Window ===
     def log_error(self, error):
@@ -302,3 +321,6 @@ class FileProcessorApp(QWidget):
             x = (rect.width() - self.width()) // 2
             y = (rect.height() - self.height()) // 2
             window.move(x, y)
+
+    def retranslate_ui(self):
+        self.setWindowTitle(tr("Обработка файлов"))

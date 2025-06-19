@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QPushButton, QHBoxLayout, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
+from utils.i18n import tr, i18n
 
 class HeaderRowPage(QWidget):
     backClicked = Signal()
@@ -12,10 +13,13 @@ class HeaderRowPage(QWidget):
         super().__init__(parent)
         self.selected_sheets = selected_sheets
         self._setup_ui()
+        i18n.language_changed.connect(self.retranslate_ui)
+        self.retranslate_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Выбери номер строки заголовка для каждого листа:"))
+        self.title_label = QLabel()
+        layout.addWidget(self.title_label)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -52,8 +56,8 @@ class HeaderRowPage(QWidget):
         layout.addWidget(scroll_area)
 
         button_layout = QHBoxLayout()
-        self.back_btn = QPushButton("Назад")
-        self.next_btn = QPushButton("Далее")
+        self.back_btn = QPushButton(tr("Назад"))
+        self.next_btn = QPushButton(tr("Далее"))
         self.back_btn.clicked.connect(self.backClicked.emit)
         self.next_btn.clicked.connect(self._on_next_clicked)
         button_layout.addStretch()
@@ -65,3 +69,9 @@ class HeaderRowPage(QWidget):
     def _on_next_clicked(self):
         result = {sheet: int(combo.currentText()) - 1 for sheet, combo in self.sheet_to_combo.items()}
         self.nextClicked.emit(result)
+
+    def retranslate_ui(self):
+        self.setWindowTitle(tr("Соответствие лист-столбец"))
+        self.title_label.setText(tr("Выбери номер строки заголовка для каждого листа:"))
+        self.back_btn.setText(tr("Назад"))
+        self.next_btn.setText(tr("Далее"))

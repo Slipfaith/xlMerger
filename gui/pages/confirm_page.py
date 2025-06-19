@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PySide6.QtCore import Qt, Signal
+from utils.i18n import tr, i18n
 
 class ConfirmPage(QWidget):
     backClicked = Signal()
@@ -12,6 +13,8 @@ class ConfirmPage(QWidget):
         super().__init__(parent)
         self.items = items
         self._build_ui()
+        i18n.language_changed.connect(self.retranslate_ui)
+        self.retranslate_ui()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -19,12 +22,12 @@ class ConfirmPage(QWidget):
         total = len(self.items)
         missing = sum(1 for _, col in self.items if not col)
         summary = f"Всего: {total}. Сопоставлено: {total - missing}. Не выбрано: {missing}."
-        lbl = QLabel(summary)
+        self.summary_label = QLabel(summary)
         if missing:
-            lbl.setStyleSheet("color: #b91c1c; font-weight: 500;")
+            self.summary_label.setStyleSheet("color: #b91c1c; font-weight: 500;")
         else:
-            lbl.setStyleSheet("color: #15803d; font-weight: 500;")
-        layout.addWidget(lbl)
+            self.summary_label.setStyleSheet("color: #15803d; font-weight: 500;")
+        layout.addWidget(self.summary_label)
 
         # Таблица сопоставлений
         table = QTableWidget(len(self.items), 2, self)
@@ -70,11 +73,11 @@ class ConfirmPage(QWidget):
 
         # Кнопки
         btn_layout = QHBoxLayout()
-        btn_back = QPushButton("Назад")
-        btn_start = QPushButton("Начать")
+        self.btn_back = QPushButton(tr("Назад"))
+        self.btn_start = QPushButton(tr("Начать"))
 
         # Стили только для кнопки "Начать"
-        btn_start.setStyleSheet("""
+        self.btn_start.setStyleSheet("""
             QPushButton {
                 background-color: #f47929;
                 color: white;
@@ -98,15 +101,22 @@ class ConfirmPage(QWidget):
         """)
 
         # Чтобы обе кнопки были одинаковые по размеру (ширине):
-        max_width = max(btn_back.sizeHint().width(), btn_start.sizeHint().width())
-        btn_back.setMinimumWidth(max_width)
-        btn_start.setMinimumWidth(max_width)
+        max_width = max(self.btn_back.sizeHint().width(), self.btn_start.sizeHint().width())
+        self.btn_back.setMinimumWidth(max_width)
+        self.btn_start.setMinimumWidth(max_width)
 
-        btn_back.clicked.connect(self.backClicked.emit)
-        btn_start.clicked.connect(self.startClicked.emit)
-        btn_start.setEnabled(True)
-        btn_layout.addWidget(btn_back)
-        btn_layout.addWidget(btn_start)
+        self.btn_back.clicked.connect(self.backClicked.emit)
+        self.btn_start.clicked.connect(self.startClicked.emit)
+        self.btn_start.setEnabled(True)
+        btn_layout.addWidget(self.btn_back)
+        btn_layout.addWidget(self.btn_start)
         layout.addLayout(btn_layout)
 
         self.setLayout(layout)
+
+    def retranslate_ui(self):
+        total = len(self.items)
+        missing = sum(1 for _, col in self.items if not col)
+        self.summary_label.setText(tr("Всего: {total}. Сопоставлено: {mapped}. Не выбрано: {missing}." ).format(total=total, mapped=total - missing, missing=missing))
+        self.btn_back.setText(tr("Назад"))
+        self.btn_start.setText(tr("Начать"))
