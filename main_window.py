@@ -71,9 +71,9 @@ class MainWindow(QMainWindow):
         self.lang_en_action = lang_en
         self.lang_ru_action = lang_ru
 
+        self.about_action = about_action
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
-        self.about_action = about_action
 
     def show_about(self):
         QMessageBox.information(self, tr("About"), tr("Объединяй и проверяй\nVersion 2 25.05.2025\nslipfaith"))
