@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
+from itertools import islice
 
 from gui.limits_checker import DraggableHeaderView
 from utils.i18n import tr
@@ -65,7 +66,7 @@ class SplitMappingDialog(QDialog):
                 model.appendRow(items)
             # detect non-empty columns (look over first 30 rows)
             non_empty = set()
-            rows_for_check = list(sheet.iter_rows(min_row=2, max_row=min(sheet.max_row, 30), values_only=True))
+            rows_for_check = list(islice(sheet.iter_rows(min_row=2, values_only=True), 30))
             if rows_for_check:
                 for idx, col in enumerate(zip(*rows_for_check)):
                     if any(v not in (None, "") for v in col):

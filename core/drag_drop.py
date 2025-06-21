@@ -12,6 +12,19 @@ class DragDropLineEdit(QLineEdit):
         self.setAcceptDrops(True)
         self.setReadOnly(True)
         self.mode = mode  # 'files_or_folder' или 'file'
+        self.setStyleSheet(
+            """
+            QLineEdit {
+                border: 2px dashed #aaa;
+                border-radius: 6px;
+                padding: 6px;
+                background: #fafafa;
+            }
+            QLineEdit:hover {
+                background: #f0f0f0;
+            }
+            """
+        )
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
