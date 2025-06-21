@@ -16,9 +16,8 @@ class SplitTab(QWidget):
         self.excel_path = ''
         self.sheet_name = ''
         self.headers = []
-        self.source_lang = ''
-        self.target_langs: list[str] = []
-        self.extra_columns: list[str] = []
+        # mapping per sheet: {sheet: (src, [targets], [extras])}
+        self.sheet_mappings: dict[str, tuple[str, list[str], list[str]]] = {}
         self.init_ui()
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
@@ -81,25 +80,24 @@ class SplitTab(QWidget):
         self.source_combo.addItems([h for h in self.headers if h])
 
         # reset current selection
-        self.source_lang = ''
-        self.target_langs = []
-        self.extra_columns = []
+        self.sheet_mappings = {}
         self.current_label.setText(tr("Текущая настройка: —"))
 
     def open_mapping_dialog(self):
         if not self.excel_path:
             QMessageBox.critical(self, tr("Ошибка"), tr("Выберите файл Excel."))
             return
-        dialog = SplitMappingDialog(self.excel_path, self.sheet_name, self)
+        wb = load_workbook(self.excel_path, read_only=True)
+        sheets = wb.sheetnames
+        wb.close()
+        dialog = SplitMappingDialog(self.excel_path, sheets, self)
         if dialog.exec():
-            src, targets, extras = dialog.get_selection()
-            if src:
-                self.source_lang = src
-                self.target_langs = targets
-                self.extra_columns = extras
+            self.sheet_mappings = dialog.get_selection()
+            if self.sheet_mappings:
+                total_targets = sum(len(cfg[1]) if cfg[1] else 0 for cfg in self.sheet_mappings.values())
                 self.current_label.setText(
-                    tr("Текущая настройка: {txt}").format(
-                        txt=f"{src} -> {', '.join(targets) if targets else '—'}; {tr('Доп')}: {', '.join(extras) if extras else '—'}"
+                    tr("Настроено листов: {n}; выбрано целей: {m}").format(
+                        n=len(self.sheet_mappings), m=total_targets
                     )
                 )
 
@@ -107,28 +105,30 @@ class SplitTab(QWidget):
         if not self.excel_path:
             QMessageBox.critical(self, tr("Ошибка"), tr("Выберите файл Excel."))
             return
-        src = self.source_lang or self.source_combo.currentText()
-        targets = self.target_langs if self.target_langs else None
-        extras = self.extra_columns
+        if not self.sheet_mappings:
+            QMessageBox.critical(self, tr("Ошибка"), tr("Сначала настройте листы."))
+            return
         try:
             progress = QProgressDialog(tr("Сохранение..."), tr("Отмена"), 0, 0, self)
             progress.setWindowTitle(tr("Прогресс"))
             progress.setWindowModality(Qt.ApplicationModal)
 
-            def cb(i, total, name):
-                progress.setMaximum(total)
-                progress.setValue(i)
-                progress.setLabelText(tr("Сохраняется: {name}").format(name=name))
-                QApplication.processEvents()
+            for sheet, (src, targets, extras) in self.sheet_mappings.items():
+                def cb(i, total, name, sh=sheet):
+                    progress.setMaximum(total)
+                    progress.setValue(i)
+                    progress.setLabelText(tr("{sheet}: {name}").format(sheet=sh, name=name))
+                    QApplication.processEvents()
 
-            split_excel_by_languages(
-                self.excel_path,
-                self.sheet_name,
-                src,
-                target_langs=targets,
-                extra_columns=extras,
-                progress_callback=cb,
-            )
+                split_excel_by_languages(
+                    self.excel_path,
+                    sheet,
+                    src,
+                    target_langs=targets if targets else None,
+                    extra_columns=extras,
+                    progress_callback=cb,
+                )
+
             progress.close()
             QMessageBox.information(self, tr("Успех"), tr("Файлы успешно сохранены."))
         except Exception as e:
@@ -138,9 +138,13 @@ class SplitTab(QWidget):
         self.setWindowTitle(tr("Разделение"))
         self.split_btn.setText(tr("Разделить"))
         self.config_btn.setText(tr("Превью"))
-        if self.source_lang:
-            txt = f"{self.source_lang} -> {', '.join(self.target_langs) if self.target_langs else '—'}; {tr('Доп')}: {', '.join(self.extra_columns) if self.extra_columns else '—'}"
-            self.current_label.setText(tr("Текущая настройка: {txt}").format(txt=txt))
+        if self.sheet_mappings:
+            total_targets = sum(len(cfg[1]) if cfg[1] else 0 for cfg in self.sheet_mappings.values())
+            self.current_label.setText(
+                tr("Настроено листов: {n}; выбрано целей: {m}").format(
+                    n=len(self.sheet_mappings), m=total_targets
+                )
+            )
         else:
             self.current_label.setText(tr("Текущая настройка: —"))
         # update labels - they are static but to refresh we need to re-add them? Not necessary
