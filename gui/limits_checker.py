@@ -23,6 +23,7 @@ def _get_int_value(value):
 # --- DRAGGABLE HEADER FOR DRAG-SELECT ---
 class DraggableHeaderView(QHeaderView):
     dragSelectionChanged = Signal(set)  # set индексов колонок
+    rightClicked = Signal(int)  # индекс колонки
 
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -39,6 +40,10 @@ class DraggableHeaderView(QHeaderView):
                 self._drag_current = index
                 self._dragging = True
                 self.dragSelectionChanged.emit({index})
+        elif event.button() == Qt.RightButton:
+            index = self.logicalIndexAt(event.position().toPoint())
+            if index >= 0:
+                self.rightClicked.emit(index)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
