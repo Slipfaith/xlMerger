@@ -1,6 +1,6 @@
 import os
 from openpyxl import Workbook, load_workbook
-from core.split_excel import split_excel_by_languages
+from core.split_excel import split_excel_by_languages, split_excel_multiple_sheets
 
 
 def test_split_excel(tmp_path):
@@ -75,4 +75,31 @@ def test_split_excel_with_non_language_target(tmp_path):
 
     out_custom = tmp_path / "ru-English Text_main.xlsx"
     assert out_custom.is_file()
+
+
+def test_split_excel_multiple_sheets(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "S1"
+    ws1.append(["ru", "de"])
+    ws1.append(["a", "b"])
+    ws2 = wb.create_sheet("S2")
+    ws2.append(["ru", "de"])
+    ws2.append(["c", "d"])
+    wb.save(src)
+    wb.close()
+
+    cfg = {
+        "S1": ("ru", ["de"], []),
+        "S2": ("ru", ["de"], []),
+    }
+
+    split_excel_multiple_sheets(str(src), cfg)
+
+    out_file = tmp_path / "ru-de_main.xlsx"
+    assert out_file.is_file()
+    out_wb = load_workbook(out_file)
+    assert set(out_wb.sheetnames) == {"S1", "S2"}
+    out_wb.close()
 

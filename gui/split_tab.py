@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
-from core.split_excel import split_excel_by_languages
+from core.split_excel import split_excel_by_languages, split_excel_multiple_sheets
 from gui.split_mapping_dialog import SplitMappingDialog
 from openpyxl import load_workbook
 
@@ -113,21 +113,26 @@ class SplitTab(QWidget):
             progress.setWindowTitle(tr("Прогресс"))
             progress.setWindowModality(Qt.ApplicationModal)
 
-            for sheet, (src, targets, extras) in self.sheet_mappings.items():
-                def cb(i, total, name, sh=sheet):
-                    progress.setMaximum(total)
-                    progress.setValue(i)
-                    progress.setLabelText(tr("{sheet}: {name}").format(sheet=sh, name=name))
-                    QApplication.processEvents()
+            def cb(i, total, name):
+                progress.setMaximum(total)
+                progress.setValue(i)
+                progress.setLabelText(name)
+                QApplication.processEvents()
 
-                split_excel_by_languages(
-                    self.excel_path,
-                    sheet,
+            cfg = {
+                sheet: (
                     src,
-                    target_langs=targets if targets else None,
-                    extra_columns=extras,
-                    progress_callback=cb,
+                    targets if targets else None,
+                    extras,
                 )
+                for sheet, (src, targets, extras) in self.sheet_mappings.items()
+            }
+
+            split_excel_multiple_sheets(
+                self.excel_path,
+                cfg,
+                progress_callback=cb,
+            )
 
             progress.close()
             QMessageBox.information(self, tr("Успех"), tr("Файлы успешно сохранены."))
