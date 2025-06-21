@@ -64,10 +64,12 @@ def split_excel_by_languages(
     for target_lang, idx in header_map.items():
         if target_lang == source_lang:
             continue
-        if target_langs is not None and target_lang not in target_langs:
-            continue
-        if not _is_lang_column(target_lang):
-            continue
+        if target_langs is not None:
+            if target_lang not in target_langs:
+                continue
+        else:
+            if not _is_lang_column(target_lang):
+                continue
         targets.append((target_lang, idx))
 
     extra_idx: List[int] = []

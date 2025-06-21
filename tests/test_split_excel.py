@@ -55,3 +55,24 @@ def test_split_excel_with_targets(tmp_path):
     assert out_de.is_file()
     assert not out_en.exists()
 
+
+def test_split_excel_with_non_language_target(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(["ru", "English Text", "Another-Lang", "comment"])
+    ws.append(["hi", "en_val", "other_val", "c1"])
+    wb.save(src)
+    wb.close()
+
+    split_excel_by_languages(
+        str(src),
+        "Sheet1",
+        "ru",
+        target_langs=["English Text"]
+    )
+
+    out_custom = tmp_path / "ru-English Text_main.xlsx"
+    assert out_custom.is_file()
+
