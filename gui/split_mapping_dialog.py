@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QComboBox,
     QListView,
-    QMessageBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
@@ -55,25 +54,30 @@ class SplitMappingDialog(QDialog):
                 str(cell.value) if cell.value is not None else ""
                 for cell in next(sheet.iter_rows(min_row=1, max_row=1))
             ]
-            model = QStandardItemModel()
-            model.setHorizontalHeaderLabels(headers)
-            rows = list(sheet.iter_rows(min_row=2, max_row=11, values_only=True))
-            for row in rows:
-                items = [
-                    QStandardItem(str(cell)) if cell is not None else QStandardItem("")
-                    for cell in row
-                ]
-                model.appendRow(items)
-            # detect non-empty columns (look over first 30 rows)
-            non_empty = set()
+            rows_for_preview = list(sheet.iter_rows(min_row=2, max_row=11, values_only=True))
             rows_for_check = list(islice(sheet.iter_rows(min_row=2, values_only=True), 30))
+
+            non_empty = {idx for idx, h in enumerate(headers) if str(h).strip() != ""}
             if rows_for_check:
                 for idx, col in enumerate(zip(*rows_for_check)):
                     if any(v not in (None, "") for v in col):
                         non_empty.add(idx)
-            self.headers_map[name] = headers
+
+            keep_idx = sorted(non_empty)
+            filtered_headers = [headers[i] for i in keep_idx]
+            model = QStandardItemModel()
+            model.setHorizontalHeaderLabels([str(h) if h is not None else "" for h in filtered_headers])
+            for row in rows_for_preview:
+                filtered_row = [row[i] if i < len(row) else None for i in keep_idx]
+                items = [
+                    QStandardItem(str(cell)) if cell is not None else QStandardItem("")
+                    for cell in filtered_row
+                ]
+                model.appendRow(items)
+
+            self.headers_map[name] = [str(h) if h is not None else "" for h in filtered_headers]
             self.models[name] = model
-            self.non_empty_cols[name] = non_empty
+            self.non_empty_cols[name] = set(range(len(keep_idx)))
         wb.close()
         self.model = self.models[self.current_sheet]
         self.headers = self.headers_map[self.current_sheet]
@@ -115,7 +119,6 @@ class SplitMappingDialog(QDialog):
             if idx not in non_empty:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 item.setForeground(QBrush(QColor("gray")))
-                item.setToolTip(tr("Пустая колонка, мы ее выделять не будем"))
             item.setCheckState(Qt.Unchecked)
             self.extra_list.addItem(item)
         self.extra_list.itemChanged.connect(self.update_label)
@@ -171,7 +174,6 @@ class SplitMappingDialog(QDialog):
             if idx not in non_empty:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 item.setForeground(QBrush(QColor("gray")))
-                item.setToolTip(tr("Пустая колонка, мы ее выделять не будем"))
             if idx in self.extra_cols:
                 item.setCheckState(Qt.Checked)
             else:
@@ -186,20 +188,15 @@ class SplitMappingDialog(QDialog):
             if start is None:
                 return
             if start not in allowed:
-                QMessageBox.information(self, tr("Предупреждение"), tr("Пустая колонка, мы ее выделять не будем"))
                 return
             self.source_col = start
             sel = {c for c in selection if c in allowed and c != self.source_col}
-            if sel != selection:
-                QMessageBox.information(self, tr("Предупреждение"), tr("Пустая колонка, мы ее выделять не будем"))
             self.target_cols.update(sel)
         else:
             sel = set(selection)
             if self.source_col in sel:
                 sel.remove(self.source_col)
             filtered = {c for c in sel if c in allowed}
-            if filtered != sel:
-                QMessageBox.information(self, tr("Предупреждение"), tr("Пустая колонка, мы ее выделять не будем"))
             self.target_cols.update(filtered)
         self.update_colors()
         self.update_label()
