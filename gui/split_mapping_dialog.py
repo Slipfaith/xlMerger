@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableView
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableView,
+    QListWidget, QListWidgetItem
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
@@ -20,6 +21,7 @@ class SplitMappingDialog(QDialog):
         self.model = QStandardItemModel()
         self.source_col: int | None = None
         self.target_cols: set[int] = set()
+        self.extra_cols: set[int] = set()
         self._load_preview()
         self._init_ui()
 
@@ -55,7 +57,17 @@ class SplitMappingDialog(QDialog):
         self.header_view = DraggableHeaderView(Qt.Horizontal, self.table)
         self.table.setHorizontalHeader(self.header_view)
         self.header_view.dragSelectionChanged.connect(self.handle_drag)
+        self.table.horizontalHeader().setStretchLastSection(False)
         layout.addWidget(self.table)
+
+        layout.addWidget(QLabel(tr("Дополнительные столбцы:")))
+        self.extra_list = QListWidget()
+        for h in self.headers:
+            item = QListWidgetItem(h)
+            item.setCheckState(Qt.Unchecked)
+            self.extra_list.addItem(item)
+        self.extra_list.itemChanged.connect(self.update_label)
+        layout.addWidget(self.extra_list)
 
         self.current_label = QLabel()
         layout.addWidget(self.current_label)
@@ -71,11 +83,17 @@ class SplitMappingDialog(QDialog):
 
         self.update_colors()
         self.update_label()
+        self.resize(700, 500)
+        self.setFixedSize(self.size())
 
     def handle_drag(self, selection: set[int]):
-        if self.source_col is None and len(selection) == 1:
-            self.source_col = next(iter(selection))
-            self.target_cols.clear()
+        start = getattr(self.header_view, "_drag_start", None)
+        if self.source_col is None:
+            if start is None:
+                return
+            self.source_col = start
+            self.target_cols = set(selection)
+            self.target_cols.discard(self.source_col)
         else:
             sel = set(selection)
             if self.source_col in sel:
@@ -97,19 +115,34 @@ class SplitMappingDialog(QDialog):
             for row in range(self.model.rowCount()):
                 idx = self.model.index(row, col)
                 self.model.setData(idx, QBrush(QColor("#b6fcb6")), Qt.BackgroundRole)
+        for col in self.extra_cols:
+            for row in range(self.model.rowCount()):
+                idx = self.model.index(row, col)
+                self.model.setData(idx, QBrush(QColor("#fff2a8")), Qt.BackgroundRole)
+
+    def _collect_extras(self):
+        self.extra_cols.clear()
+        for i in range(self.extra_list.count()):
+            item = self.extra_list.item(i)
+            if item.checkState() == Qt.Checked:
+                if i != self.source_col and i not in self.target_cols:
+                    self.extra_cols.add(i)
 
     def update_label(self):
+        self._collect_extras()
         if self.source_col is None:
-            txt = f"{tr('Источник')}: —; {tr('Цели')}: —"
+            txt = f"{tr('Источник')}: —; {tr('Цели')}: —; {tr('Доп')}: —"
         else:
             src = self.headers[self.source_col]
             tgts = [self.headers[c] for c in sorted(self.target_cols)] if self.target_cols else ['—']
-            txt = f"{tr('Источник')}: {src}; {tr('Цели')}: {', '.join(tgts)}"
+            extras = [self.headers[c] for c in sorted(self.extra_cols)] if self.extra_cols else ['—']
+            txt = f"{tr('Источник')}: {src}; {tr('Цели')}: {', '.join(tgts)}; {tr('Доп')}: {', '.join(extras)}"
         self.current_label.setText(tr("Текущая настройка: {txt}").format(txt=txt))
 
     def get_selection(self):
         if self.source_col is None:
-            return None, []
+            return None, [], []
         source = self.headers[self.source_col]
         targets = [self.headers[c] for c in sorted(self.target_cols)]
-        return source, targets
+        extras = [self.headers[c] for c in sorted(self.extra_cols)]
+        return source, targets, extras

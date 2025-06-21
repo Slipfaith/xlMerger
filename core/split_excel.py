@@ -1,5 +1,6 @@
 from openpyxl import load_workbook, Workbook
 import os
+from typing import Callable, Iterable, List
 
 
 def _is_lang_column(name: str) -> bool:
@@ -17,7 +18,9 @@ def split_excel_by_languages(
     source_lang: str,
     output_dir: str | None = None,
     target_langs: list[str] | None = None,
-):
+    extra_columns: list[str] | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> List[str]:
     """Split Excel into language pairs.
 
     Parameters
@@ -34,8 +37,12 @@ def split_excel_by_languages(
     target_langs : list[str] | None, optional
         List of target language columns to include. If ``None`` all language
         columns are used.
+    extra_columns : list[str] | None, optional
+        Additional columns to copy to each output file.
+    progress_callback : Callable[[int, int, str], None] | None, optional
+        Called after each file is saved with ``(index, total, name)``.
     """
-    wb = load_workbook(excel_path, read_only=True)
+    wb = load_workbook(excel_path)
     sheet = wb[sheet_name]
     headers = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
     header_map = {str(h): idx + 1 for idx, h in enumerate(headers) if h is not None}
@@ -53,8 +60,7 @@ def split_excel_by_languages(
             wb.close()
             raise ValueError(f"Target column(s) {', '.join(missing)} not found")
 
-    source_idx = header_map[source_lang]
-
+    targets: List[tuple[str, int]] = []
     for target_lang, idx in header_map.items():
         if target_lang == source_lang:
             continue
@@ -62,18 +68,49 @@ def split_excel_by_languages(
             continue
         if not _is_lang_column(target_lang):
             continue
+        targets.append((target_lang, idx))
+
+    extra_idx: List[int] = []
+    extra_headers: List[str] = []
+    if extra_columns:
+        for col in extra_columns:
+            if col in header_map and col not in [source_lang]:
+                extra_idx.append(header_map[col])
+                extra_headers.append(col)
+
+    created: List[str] = []
+
+    source_idx = header_map[source_lang]
+
+    for i, (target_lang, idx) in enumerate(targets, start=1):
         new_wb = Workbook()
         ws_new = new_wb.active
         ws_new.title = sheet_name
-        ws_new.cell(row=1, column=1, value=source_lang)
-        ws_new.cell(row=1, column=2, value=target_lang)
+        col_pos = 1
+        ws_new.cell(row=1, column=col_pos, value=source_lang)
+        col_pos += 1
+        ws_new.cell(row=1, column=col_pos, value=target_lang)
+        col_pos += 1
+        for header in extra_headers:
+            ws_new.cell(row=1, column=col_pos, value=header)
+            col_pos += 1
         for row in range(2, sheet.max_row + 1):
-            ws_new.cell(row=row, column=1, value=sheet.cell(row=row, column=source_idx).value)
-            ws_new.cell(row=row, column=2, value=sheet.cell(row=row, column=idx).value)
+            col_pos = 1
+            ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=source_idx).value)
+            col_pos += 1
+            ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=idx).value)
+            col_pos += 1
+            for ex_idx in extra_idx:
+                ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=ex_idx).value)
+                col_pos += 1
         base, ext = os.path.splitext(os.path.basename(excel_path))
         out_name = f"{source_lang}-{target_lang}_{base}{ext}"
         out_path = os.path.join(output_dir, out_name)
         new_wb.save(out_path)
         new_wb.close()
+        created.append(out_path)
+        if progress_callback:
+            progress_callback(i, len(targets), out_name)
 
     wb.close()
+    return created

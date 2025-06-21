@@ -155,5 +155,10 @@
   "Ячейки: {cells}; Верхний={upper if upper is not None else '—'}, Нижний={lower if lower is not None else '—'}": "Ячейки: {cells}; Верхний={upper if upper is not None else '—'}, Нижний={lower if lower is not None else '—'}",
   "длина = {text_length} (лимит {current_limit})": "длина = {text_length} (лимит {current_limit})",
   "длина = {text_length} (нижний лимит {current_lower})": "длина = {text_length} (нижний лимит {current_lower})",
-  "✔ Готово!": "✔ Готово!"
+  "✔ Готово!": "✔ Готово!",
+  "Дополнительные столбцы:": "Дополнительные столбцы:",
+  "Доп": "Доп",
+  "Сохранение...": "Сохранение...",
+  "Прогресс": "Прогресс",
+  "Сохраняется: {name}": "Сохраняется: {name}"
 }

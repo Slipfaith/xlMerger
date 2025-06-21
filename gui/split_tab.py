@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QMessageBox
+    QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QMessageBox,
+    QApplication, QProgressDialog
 )
+from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
 from core.split_excel import split_excel_by_languages
@@ -16,6 +18,7 @@ class SplitTab(QWidget):
         self.headers = []
         self.source_lang = ''
         self.target_langs: list[str] = []
+        self.extra_columns: list[str] = []
         self.init_ui()
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
@@ -80,6 +83,7 @@ class SplitTab(QWidget):
         # reset current selection
         self.source_lang = ''
         self.target_langs = []
+        self.extra_columns = []
         self.current_label.setText(tr("Текущая настройка: —"))
 
     def open_mapping_dialog(self):
@@ -88,13 +92,14 @@ class SplitTab(QWidget):
             return
         dialog = SplitMappingDialog(self.excel_path, self.sheet_name, self)
         if dialog.exec():
-            src, targets = dialog.get_selection()
+            src, targets, extras = dialog.get_selection()
             if src:
                 self.source_lang = src
                 self.target_langs = targets
+                self.extra_columns = extras
                 self.current_label.setText(
                     tr("Текущая настройка: {txt}").format(
-                        txt=f"{src} -> {', '.join(targets) if targets else '—'}"
+                        txt=f"{src} -> {', '.join(targets) if targets else '—'}; {tr('Доп')}: {', '.join(extras) if extras else '—'}"
                     )
                 )
 
@@ -104,13 +109,27 @@ class SplitTab(QWidget):
             return
         src = self.source_lang or self.source_combo.currentText()
         targets = self.target_langs if self.target_langs else None
+        extras = self.extra_columns
         try:
+            progress = QProgressDialog(tr("Сохранение..."), tr("Отмена"), 0, 0, self)
+            progress.setWindowTitle(tr("Прогресс"))
+            progress.setWindowModality(Qt.ApplicationModal)
+
+            def cb(i, total, name):
+                progress.setMaximum(total)
+                progress.setValue(i)
+                progress.setLabelText(tr("Сохраняется: {name}").format(name=name))
+                QApplication.processEvents()
+
             split_excel_by_languages(
                 self.excel_path,
                 self.sheet_name,
                 src,
                 target_langs=targets,
+                extra_columns=extras,
+                progress_callback=cb,
             )
+            progress.close()
             QMessageBox.information(self, tr("Успех"), tr("Файлы успешно сохранены."))
         except Exception as e:
             QMessageBox.critical(self, tr("Ошибка"), str(e))
@@ -119,5 +138,9 @@ class SplitTab(QWidget):
         self.setWindowTitle(tr("Разделение"))
         self.split_btn.setText(tr("Разделить"))
         self.config_btn.setText(tr("Превью"))
-        self.current_label.setText(tr("Текущая настройка: —"))
+        if self.source_lang:
+            txt = f"{self.source_lang} -> {', '.join(self.target_langs) if self.target_langs else '—'}; {tr('Доп')}: {', '.join(self.extra_columns) if self.extra_columns else '—'}"
+            self.current_label.setText(tr("Текущая настройка: {txt}").format(txt=txt))
+        else:
+            self.current_label.setText(tr("Текущая настройка: —"))
         # update labels - they are static but to refresh we need to re-add them? Not necessary
