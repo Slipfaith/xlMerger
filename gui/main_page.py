@@ -128,28 +128,7 @@ class MainPageWidget(QWidget):
 
     def create_process_button(self):
         self.process_button = QPushButton(tr("Начать"), self)
-        self.process_button.setStyleSheet("""
-            QPushButton {
-                background-color: #f47929;
-                color: white;
-                border-radius: 6px;
-                padding: 4px 14px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #65d88f;  /* светло-зелёный, неяркий */
-                color: #222;
-            }
-            QPushButton:pressed {
-                background-color: #41bb6f;
-                color: white;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #888888;
-            }
-        """)
+        # Стили убраны, используем стандартный вид с границами
         self.process_button.clicked.connect(self.processTriggered)
         return self.process_button
 

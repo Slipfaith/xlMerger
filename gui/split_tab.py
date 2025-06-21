@@ -48,7 +48,7 @@ class SplitTab(QWidget):
         right = QVBoxLayout()
         self.current_label = QLabel(tr("Текущая настройка: —"))
         self.current_label.setWordWrap(True)
-        right.addWidget(self.current_label)
+        self.current_label.hide()
         right.addStretch()
 
         layout.addLayout(right)
@@ -57,7 +57,6 @@ class SplitTab(QWidget):
         self.setStyleSheet(
             """
             QWidget {font-size: 14px;}
-            QPushButton {padding: 6px 12px; border-radius: 4px;}
             QLineEdit {font-size:14px;}
             """
         )

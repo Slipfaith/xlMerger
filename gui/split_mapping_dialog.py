@@ -264,7 +264,7 @@ class SplitMappingDialog(QDialog):
                 f"{tr('Цели')}: {', '.join(tgts)}\n"
                 f"{tr('Доп')}: {', '.join(extras)}"
             )
-        self.count_label.setText(tr("Выбрано целей: {n}").format(n=len(self.target_cols)))
+        self.count_label.setText(tr("Выбрано таргетов: {n}").format(n=len(self.target_cols)))
         self.current_label.setText(tr("Текущая настройка:\n{txt}").format(txt=txt))
 
     def get_selection(self):

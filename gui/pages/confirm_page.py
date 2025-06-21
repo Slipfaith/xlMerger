@@ -76,29 +76,7 @@ class ConfirmPage(QWidget):
         self.btn_back = QPushButton(tr("Назад"))
         self.btn_start = QPushButton(tr("Начать"))
 
-        # Стили только для кнопки "Начать"
-        self.btn_start.setStyleSheet("""
-            QPushButton {
-                background-color: #f47929;
-                color: white;
-                border-radius: 6px;
-                padding: 4px 14px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #65d88f;
-                color: #222;
-            }
-            QPushButton:pressed {
-                background-color: #41bb6f;
-                color: white;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #888888;
-            }
-        """)
+        # Стили убраны, используем системные границы кнопок
 
         # Чтобы обе кнопки были одинаковые по размеру (ширине):
         max_width = max(self.btn_back.sizeHint().width(), self.btn_start.sizeHint().width())

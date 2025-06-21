@@ -123,7 +123,7 @@ def split_excel_by_languages(
                 _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
         base, ext = os.path.splitext(os.path.basename(excel_path))
-        out_name = f"{source_lang}-{target_lang}_{base}{ext}"
+        out_name = f"{base}_{source_lang}-{target_lang}{ext}"
         out_path = os.path.join(output_dir, out_name)
         new_wb.save(out_path)
         new_wb.close()
@@ -244,7 +244,7 @@ def split_excel_multiple_sheets(
 
     for i, (tgt, new_wb) in enumerate(workbooks.items(), start=1):
         src_part = next(iter(sources)) if len(sources) == 1 else "src"
-        out_name = f"{src_part}-{tgt}_{base}{ext}"
+        out_name = f"{base}_{src_part}-{tgt}{ext}"
         out_path = os.path.join(output_dir, out_name)
         new_wb.save(out_path)
         new_wb.close()

@@ -15,8 +15,8 @@ def test_split_excel(tmp_path):
 
     split_excel_by_languages(str(src), "Sheet1", "ru")
 
-    out_de = tmp_path / "ru-de_main.xlsx"
-    out_en = tmp_path / "ru-en_main.xlsx"
+    out_de = tmp_path / "main_ru-de.xlsx"
+    out_en = tmp_path / "main_ru-en.xlsx"
 
     assert out_de.is_file()
     assert out_en.is_file()
@@ -49,8 +49,8 @@ def test_split_excel_with_targets(tmp_path):
 
     split_excel_by_languages(str(src), "Sheet1", "ru", target_langs=["de"])
 
-    out_de = tmp_path / "ru-de_main.xlsx"
-    out_en = tmp_path / "ru-en_main.xlsx"
+    out_de = tmp_path / "main_ru-de.xlsx"
+    out_en = tmp_path / "main_ru-en.xlsx"
 
     assert out_de.is_file()
     assert not out_en.exists()
@@ -73,7 +73,7 @@ def test_split_excel_with_non_language_target(tmp_path):
         target_langs=["English Text"]
     )
 
-    out_custom = tmp_path / "ru-English Text_main.xlsx"
+    out_custom = tmp_path / "main_ru-English Text.xlsx"
     assert out_custom.is_file()
 
 
@@ -97,7 +97,7 @@ def test_split_excel_multiple_sheets(tmp_path):
 
     split_excel_multiple_sheets(str(src), cfg)
 
-    out_file = tmp_path / "ru-de_main.xlsx"
+    out_file = tmp_path / "main_ru-de.xlsx"
     assert out_file.is_file()
     out_wb = load_workbook(out_file)
     assert set(out_wb.sheetnames) == {"S1", "S2"}
@@ -119,7 +119,7 @@ def test_split_preserves_format(tmp_path):
 
     split_excel_by_languages(str(src), "Sheet1", "ru")
 
-    out_file = tmp_path / "ru-de_main.xlsx"
+    out_file = tmp_path / "main_ru-de.xlsx"
     wb2 = load_workbook(out_file)
     ws2 = wb2.active
     assert ws2.cell(row=2, column=1).font.bold is True
