@@ -35,3 +35,23 @@ def test_split_excel(tmp_path):
     assert ws_en.cell(row=2, column=1).value == "привет"
     assert ws_en.cell(row=2, column=2).value == "hello"
     wb_en.close()
+
+
+def test_split_excel_with_targets(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(["ru", "de", "en", "comment"])
+    ws.append(["hi", "de_val", "en_val", "c1"])
+    wb.save(src)
+    wb.close()
+
+    split_excel_by_languages(str(src), "Sheet1", "ru", target_langs=["de"])
+
+    out_de = tmp_path / "ru-de_main.xlsx"
+    out_en = tmp_path / "ru-en_main.xlsx"
+
+    assert out_de.is_file()
+    assert not out_en.exists()
+
