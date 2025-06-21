@@ -249,8 +249,10 @@ class SplitMappingDialog(QDialog):
                     self.extra_cols.add(col_idx)
 
     def update_label(self):
-        self._rebuild_extra_list()
+        # first collect states from the current list
         self._collect_extras()
+        # rebuild list to reflect current source/target selections
+        self._rebuild_extra_list()
         if self.source_col is None:
             txt = f"{tr('Источник')}: —\n{tr('Цели')}: —\n{tr('Доп')}: —"
         else:

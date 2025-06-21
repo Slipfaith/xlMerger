@@ -53,16 +53,11 @@ class SplitTab(QWidget):
 
         layout.addLayout(right)
 
+        # minimal styling for buttons and widgets
         self.setStyleSheet(
             """
             QWidget {font-size: 14px;}
-            QPushButton {
-                padding: 8px 16px;
-                border-radius: 8px;
-                background: #2196F3;
-                color: white;
-            }
-            QPushButton:hover {background: #1976D2;}
+            QPushButton {padding: 6px 12px; border-radius: 4px;}
             QLineEdit {font-size:14px;}
             """
         )
