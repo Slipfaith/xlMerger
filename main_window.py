@@ -12,7 +12,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(tr("xlMerger: объединяй и проверяй"))
         self.setWindowIcon(QIcon(r"C:\Users\yanismik\Desktop\PythonProject1\xlM_2.0\xlM2.0.ico"))  # <- иконка здесь
-        self.init_menu()
 
         # Создаем QTabWidget и добавляем вкладки
         self.tab_widget = QTabWidget()
@@ -30,6 +29,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.split_tab_widget, tr("Разделение"))
 
         self.setCentralWidget(self.tab_widget)
+        self.init_menu()
         self.show()
 
     def retranslate_ui(self):
