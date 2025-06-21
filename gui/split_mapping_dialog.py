@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QComboBox,
     QListView,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
@@ -31,6 +32,8 @@ class SplitMappingDialog(QDialog):
 
         self.headers_map: dict[str, list[str]] = {}
         self.models: dict[str, QStandardItemModel] = {}
+        # columns that contain at least one non-empty value for each sheet
+        self.non_empty_cols: dict[str, set[int]] = {}
         self.configs = {
             name: {"src": None, "targets": set(), "extra": set()}
             for name in sheet_names
@@ -60,8 +63,16 @@ class SplitMappingDialog(QDialog):
                     for cell in row
                 ]
                 model.appendRow(items)
+            # detect non-empty columns (look over first 30 rows)
+            non_empty = set()
+            rows_for_check = list(sheet.iter_rows(min_row=2, max_row=min(sheet.max_row, 30), values_only=True))
+            if rows_for_check:
+                for idx, col in enumerate(zip(*rows_for_check)):
+                    if any(v not in (None, "") for v in col):
+                        non_empty.add(idx)
             self.headers_map[name] = headers
             self.models[name] = model
+            self.non_empty_cols[name] = non_empty
         wb.close()
         self.model = self.models[self.current_sheet]
         self.headers = self.headers_map[self.current_sheet]
@@ -97,8 +108,13 @@ class SplitMappingDialog(QDialog):
         self.extra_list.setFlow(QListView.LeftToRight)
         self.extra_list.setWrapping(True)
         self.extra_list.setMaximumHeight(80)
-        for h in self.headers:
+        non_empty = self.non_empty_cols.get(self.current_sheet, set())
+        for idx, h in enumerate(self.headers):
             item = QListWidgetItem(h)
+            if idx not in non_empty:
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                item.setForeground(QBrush(QColor("gray")))
+                item.setToolTip(tr("Пустая колонка, мы ее выделять не будем"))
             item.setCheckState(Qt.Unchecked)
             self.extra_list.addItem(item)
         self.extra_list.itemChanged.connect(self.update_label)
@@ -148,8 +164,13 @@ class SplitMappingDialog(QDialog):
     def _rebuild_extra_list(self):
         self.extra_list.blockSignals(True)
         self.extra_list.clear()
+        non_empty = self.non_empty_cols.get(self.current_sheet, set())
         for idx, h in enumerate(self.headers):
             item = QListWidgetItem(h)
+            if idx not in non_empty:
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                item.setForeground(QBrush(QColor("gray")))
+                item.setToolTip(tr("Пустая колонка, мы ее выделять не будем"))
             if idx in self.extra_cols:
                 item.setCheckState(Qt.Checked)
             else:
@@ -159,17 +180,26 @@ class SplitMappingDialog(QDialog):
 
     def handle_drag(self, selection: set[int]):
         start = getattr(self.header_view, "_drag_start", None)
+        allowed = self.non_empty_cols.get(self.current_sheet, set())
         if self.source_col is None:
             if start is None:
                 return
+            if start not in allowed:
+                QMessageBox.information(self, tr("Предупреждение"), tr("Пустая колонка, мы ее выделять не будем"))
+                return
             self.source_col = start
-            self.target_cols.update(selection)
-            self.target_cols.discard(self.source_col)
+            sel = {c for c in selection if c in allowed and c != self.source_col}
+            if sel != selection:
+                QMessageBox.information(self, tr("Предупреждение"), tr("Пустая колонка, мы ее выделять не будем"))
+            self.target_cols.update(sel)
         else:
             sel = set(selection)
             if self.source_col in sel:
                 sel.remove(self.source_col)
-            self.target_cols.update(sel)
+            filtered = {c for c in sel if c in allowed}
+            if filtered != sel:
+                QMessageBox.information(self, tr("Предупреждение"), tr("Пустая колонка, мы ее выделять не будем"))
+            self.target_cols.update(filtered)
         self.update_colors()
         self.update_label()
 
@@ -206,6 +236,8 @@ class SplitMappingDialog(QDialog):
         self.extra_cols.clear()
         for i in range(self.extra_list.count()):
             item = self.extra_list.item(i)
+            if not item.flags() & Qt.ItemIsEnabled:
+                continue
             if item.checkState() == Qt.Checked:
                 if i != self.source_col and i not in self.target_cols:
                     self.extra_cols.add(i)

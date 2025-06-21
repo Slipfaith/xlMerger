@@ -26,7 +26,8 @@ class MainWindow(QMainWindow):
 
         # Вкладка для разделения Excel
         self.split_tab_widget = SplitTab()
-        self.tab_widget.addTab(self.split_tab_widget, tr("Разделение"))
+        # Tab renamed from "Разделение" to "xlSpliter"
+        self.tab_widget.addTab(self.split_tab_widget, tr("xlSpliter"))
 
         self.setCentralWidget(self.tab_widget)
         self.init_menu()
@@ -41,7 +42,7 @@ class MainWindow(QMainWindow):
         self.language_menu.setTitle(tr("Language"))
         self.tab_widget.setTabText(0, tr("xlMerger"))
         self.tab_widget.setTabText(1, tr("Лимит чек"))
-        self.tab_widget.setTabText(2, tr("Разделение"))
+        self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.update_action.setText(tr("Check for Updates"))
 
     def init_menu(self):
