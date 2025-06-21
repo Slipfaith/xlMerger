@@ -57,6 +57,7 @@ class SplitMappingDialog(QDialog):
         self.header_view = DraggableHeaderView(Qt.Horizontal, self.table)
         self.table.setHorizontalHeader(self.header_view)
         self.header_view.dragSelectionChanged.connect(self.handle_drag)
+        self.header_view.rightClicked.connect(self.handle_right_click)
         self.table.horizontalHeader().setStretchLastSection(False)
         layout.addWidget(self.table)
 
@@ -92,13 +93,24 @@ class SplitMappingDialog(QDialog):
             if start is None:
                 return
             self.source_col = start
-            self.target_cols = set(selection)
+            self.target_cols.update(selection)
             self.target_cols.discard(self.source_col)
         else:
             sel = set(selection)
             if self.source_col in sel:
                 sel.remove(self.source_col)
-            self.target_cols = sel
+            self.target_cols.update(sel)
+        self.update_colors()
+        self.update_label()
+
+    def handle_right_click(self, index: int):
+        if index == self.source_col:
+            self.source_col = None
+            self.target_cols.clear()
+        elif index in self.target_cols:
+            self.target_cols.remove(index)
+        else:
+            return
         self.update_colors()
         self.update_label()
 
