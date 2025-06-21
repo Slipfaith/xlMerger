@@ -4,6 +4,7 @@ from utils.i18n import tr, i18n
 
 from gui.file_processor_app import FileProcessorApp
 from gui.limits_checker import LimitsChecker
+from gui.split_tab import SplitTab
 from PySide6.QtGui import QIcon
 
 class MainWindow(QMainWindow):
@@ -24,6 +25,10 @@ class MainWindow(QMainWindow):
         self.limits_checker_widget = LimitsChecker()
         self.tab_widget.addTab(self.limits_checker_widget, tr("Лимит чек"))
 
+        # Вкладка для разделения Excel
+        self.split_tab_widget = SplitTab()
+        self.tab_widget.addTab(self.split_tab_widget, tr("Разделение"))
+
         self.setCentralWidget(self.tab_widget)
         self.show()
 
@@ -36,6 +41,7 @@ class MainWindow(QMainWindow):
         self.language_menu.setTitle(tr("Language"))
         self.tab_widget.setTabText(0, tr("xlMerger"))
         self.tab_widget.setTabText(1, tr("Лимит чек"))
+        self.tab_widget.setTabText(2, tr("Разделение"))
         self.update_action.setText(tr("Check for Updates"))
 
     def init_menu(self):
