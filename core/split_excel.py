@@ -2,6 +2,7 @@ from openpyxl import load_workbook, Workbook
 from copy import copy
 import os
 from typing import Callable, List, Dict, Tuple
+from openpyxl.utils import get_column_letter
 
 
 def _is_lang_column(name: str) -> bool:
@@ -23,6 +24,13 @@ def _copy_cell(src, dst):
         dst.number_format = copy(src.number_format)
         dst.protection = copy(src.protection)
         dst.alignment = copy(src.alignment)
+
+def _copy_column_width(src_sheet, dst_sheet, src_idx: int, dst_idx: int):
+    src_letter = get_column_letter(src_idx)
+    dst_letter = get_column_letter(dst_idx)
+    width = src_sheet.column_dimensions[src_letter].width
+    if width is not None:
+        dst_sheet.column_dimensions[dst_letter].width = width
 
 
 def split_excel_by_languages(
@@ -104,14 +112,17 @@ def split_excel_by_languages(
         col_pos = 1
         _copy_cell(sheet.cell(row=1, column=source_idx), ws_new.cell(row=1, column=col_pos))
         ws_new.cell(row=1, column=col_pos).value = source_lang
+        _copy_column_width(sheet, ws_new, source_idx, col_pos)
         col_pos += 1
         _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
         ws_new.cell(row=1, column=col_pos).value = target_lang
+        _copy_column_width(sheet, ws_new, idx, col_pos)
         col_pos += 1
         for header in extra_headers:
             ex_idx = header_map[header]
             _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
             ws_new.cell(row=1, column=col_pos).value = header
+            _copy_column_width(sheet, ws_new, ex_idx, col_pos)
             col_pos += 1
         for row in range(2, sheet.max_row + 1):
             col_pos = 1
@@ -219,14 +230,17 @@ def split_excel_multiple_sheets(
                 col_pos = 1
                 _copy_cell(sheet.cell(row=1, column=src_idx), ws_new.cell(row=1, column=col_pos))
                 ws_new.cell(row=1, column=col_pos).value = src
+                _copy_column_width(sheet, ws_new, src_idx, col_pos)
                 col_pos += 1
                 _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
                 ws_new.cell(row=1, column=col_pos).value = tgt
+                _copy_column_width(sheet, ws_new, idx, col_pos)
                 col_pos += 1
                 for header in extra_headers:
                     ex_idx = header_map[header]
                     _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
                     ws_new.cell(row=1, column=col_pos).value = header
+                    _copy_column_width(sheet, ws_new, ex_idx, col_pos)
                     col_pos += 1
 
             for row in range(2, sheet.max_row + 1):

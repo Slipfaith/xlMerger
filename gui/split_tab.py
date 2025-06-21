@@ -91,6 +91,9 @@ class SplitTab(QWidget):
             progress = QProgressDialog(tr("Сохранение..."), tr("Отмена"), 0, 0, self)
             progress.setWindowTitle(tr("Прогресс"))
             progress.setWindowModality(Qt.ApplicationModal)
+            progress.setMinimumDuration(0)
+            progress.show()
+            QApplication.processEvents()
 
             def cb(i, total, name):
                 progress.setMaximum(total)
