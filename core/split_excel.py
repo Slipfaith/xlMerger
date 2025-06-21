@@ -1,4 +1,5 @@
 from openpyxl import load_workbook, Workbook
+from copy import copy
 import os
 from typing import Callable, List, Dict, Tuple
 
@@ -10,6 +11,18 @@ def _is_lang_column(name: str) -> bool:
     if len(name) > 5 or ' ' in name or '_' in name:
         return False
     return name.isalpha()
+
+
+def _copy_cell(src, dst):
+    """Copy value and style from ``src`` cell to ``dst`` cell."""
+    dst.value = src.value
+    if src.has_style:
+        dst.font = copy(src.font)
+        dst.border = copy(src.border)
+        dst.fill = copy(src.fill)
+        dst.number_format = copy(src.number_format)
+        dst.protection = copy(src.protection)
+        dst.alignment = copy(src.alignment)
 
 
 def split_excel_by_languages(
@@ -89,21 +102,25 @@ def split_excel_by_languages(
         ws_new = new_wb.active
         ws_new.title = sheet_name
         col_pos = 1
-        ws_new.cell(row=1, column=col_pos, value=source_lang)
+        _copy_cell(sheet.cell(row=1, column=source_idx), ws_new.cell(row=1, column=col_pos))
+        ws_new.cell(row=1, column=col_pos).value = source_lang
         col_pos += 1
-        ws_new.cell(row=1, column=col_pos, value=target_lang)
+        _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
+        ws_new.cell(row=1, column=col_pos).value = target_lang
         col_pos += 1
         for header in extra_headers:
-            ws_new.cell(row=1, column=col_pos, value=header)
+            ex_idx = header_map[header]
+            _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
+            ws_new.cell(row=1, column=col_pos).value = header
             col_pos += 1
         for row in range(2, sheet.max_row + 1):
             col_pos = 1
-            ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=source_idx).value)
+            _copy_cell(sheet.cell(row=row, column=source_idx), ws_new.cell(row=row, column=col_pos))
             col_pos += 1
-            ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=idx).value)
+            _copy_cell(sheet.cell(row=row, column=idx), ws_new.cell(row=row, column=col_pos))
             col_pos += 1
             for ex_idx in extra_idx:
-                ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=ex_idx).value)
+                _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
         base, ext = os.path.splitext(os.path.basename(excel_path))
         out_name = f"{source_lang}-{target_lang}_{base}{ext}"
@@ -200,22 +217,26 @@ def split_excel_multiple_sheets(
 
             if ws_new.max_row == 1 and ws_new.max_column == 1 and ws_new.cell(row=1, column=1).value is None:
                 col_pos = 1
-                ws_new.cell(row=1, column=col_pos, value=src)
+                _copy_cell(sheet.cell(row=1, column=src_idx), ws_new.cell(row=1, column=col_pos))
+                ws_new.cell(row=1, column=col_pos).value = src
                 col_pos += 1
-                ws_new.cell(row=1, column=col_pos, value=tgt)
+                _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
+                ws_new.cell(row=1, column=col_pos).value = tgt
                 col_pos += 1
                 for header in extra_headers:
-                    ws_new.cell(row=1, column=col_pos, value=header)
+                    ex_idx = header_map[header]
+                    _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
+                    ws_new.cell(row=1, column=col_pos).value = header
                     col_pos += 1
 
             for row in range(2, sheet.max_row + 1):
                 col_pos = 1
-                ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=src_idx).value)
+                _copy_cell(sheet.cell(row=row, column=src_idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
-                ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=idx).value)
+                _copy_cell(sheet.cell(row=row, column=idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
                 for ex_idx in extra_idx:
-                    ws_new.cell(row=row, column=col_pos, value=sheet.cell(row=row, column=ex_idx).value)
+                    _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
                     col_pos += 1
 
     base, ext = os.path.splitext(os.path.basename(excel_path))

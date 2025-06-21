@@ -23,11 +23,15 @@ class SplitTab(QWidget):
 
     def init_ui(self):
         layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(30)
 
         left = QVBoxLayout()
+        left.setSpacing(15)
         self.file_input = DragDropLineEdit(mode='file')
         self.file_input.setPlaceholderText(tr("Перетащи сюда эксель"))
         self.file_input.fileSelected.connect(self.on_file_selected)
+        self.file_input.setMinimumHeight(40)
         left.addWidget(self.file_input)
 
         self.config_btn = QPushButton(tr("Превью"))
@@ -48,6 +52,20 @@ class SplitTab(QWidget):
         right.addStretch()
 
         layout.addLayout(right)
+
+        self.setStyleSheet(
+            """
+            QWidget {font-size: 14px;}
+            QPushButton {
+                padding: 8px 16px;
+                border-radius: 8px;
+                background: #2196F3;
+                color: white;
+            }
+            QPushButton:hover {background: #1976D2;}
+            QLineEdit {font-size:14px;}
+            """
+        )
 
     def on_file_selected(self, path):
         """Store selected Excel path and reset mappings."""
