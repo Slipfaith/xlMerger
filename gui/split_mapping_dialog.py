@@ -169,16 +169,23 @@ class SplitMappingDialog(QDialog):
         self.extra_list.blockSignals(True)
         self.extra_list.clear()
         non_empty = self.non_empty_cols.get(self.current_sheet, set())
+        excluded = {self.source_col} | set(self.target_cols)
+        new_extra = set()
         for idx, h in enumerate(self.headers):
+            if idx in excluded:
+                continue
             item = QListWidgetItem(h)
+            item.setData(Qt.UserRole, idx)
             if idx not in non_empty:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 item.setForeground(QBrush(QColor("gray")))
             if idx in self.extra_cols:
                 item.setCheckState(Qt.Checked)
+                new_extra.add(idx)
             else:
                 item.setCheckState(Qt.Unchecked)
             self.extra_list.addItem(item)
+        self.extra_cols.intersection_update(new_extra)
         self.extra_list.blockSignals(False)
 
     def handle_drag(self, selection: set[int]):
@@ -237,10 +244,12 @@ class SplitMappingDialog(QDialog):
             if not item.flags() & Qt.ItemIsEnabled:
                 continue
             if item.checkState() == Qt.Checked:
-                if i != self.source_col and i not in self.target_cols:
-                    self.extra_cols.add(i)
+                col_idx = item.data(Qt.UserRole)
+                if col_idx not in {self.source_col} | set(self.target_cols):
+                    self.extra_cols.add(col_idx)
 
     def update_label(self):
+        self._rebuild_extra_list()
         self._collect_extras()
         if self.source_col is None:
             txt = f"{tr('Источник')}: —\n{tr('Цели')}: —\n{tr('Доп')}: —"

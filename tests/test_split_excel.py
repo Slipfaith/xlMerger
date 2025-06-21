@@ -103,3 +103,26 @@ def test_split_excel_multiple_sheets(tmp_path):
     assert set(out_wb.sheetnames) == {"S1", "S2"}
     out_wb.close()
 
+
+def test_split_preserves_format(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    from openpyxl.styles import Font, PatternFill
+    ws.append(["ru", "de"])
+    ws.append(["a", "b"])
+    ws.cell(row=2, column=1).font = Font(bold=True)
+    ws.cell(row=2, column=1).fill = PatternFill(fill_type="solid", fgColor="FFFF00")
+    wb.save(src)
+    wb.close()
+
+    split_excel_by_languages(str(src), "Sheet1", "ru")
+
+    out_file = tmp_path / "ru-de_main.xlsx"
+    wb2 = load_workbook(out_file)
+    ws2 = wb2.active
+    assert ws2.cell(row=2, column=1).font.bold is True
+    assert ws2.cell(row=2, column=1).fill.fgColor.rgb in {"FFFFFF00", "FFFF00"}
+    wb2.close()
+
