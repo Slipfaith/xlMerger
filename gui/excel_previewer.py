@@ -3,12 +3,29 @@ import os
 import traceback
 import pandas as pd
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QComboBox, QTableView, QMessageBox, QHeaderView
+    QWidget, QVBoxLayout, QComboBox, QTableView, QMessageBox,
+    QHeaderView, QCheckBox, QMenu
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QStandardItemModel, QStandardItem
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
 import openpyxl.utils as utils
+
+
+class ClickableHeaderView(QHeaderView):
+    """Header view emitting signals on left and right clicks."""
+
+    leftClicked = Signal(int)
+    rightClicked = Signal(int)
+
+    def mousePressEvent(self, event):
+        index = self.logicalIndexAt(event.position().toPoint())
+        if index >= 0:
+            if event.button() == Qt.LeftButton:
+                self.leftClicked.emit(index)
+            elif event.button() == Qt.RightButton:
+                self.rightClicked.emit(index)
+        super().mousePressEvent(event)
 
 class ExcelPreviewer(QWidget):
     def __init__(self, excel_path):
@@ -17,16 +34,26 @@ class ExcelPreviewer(QWidget):
         self.workbook = load_workbook(excel_path, read_only=True)
         self.sheet_names = self.workbook.sheetnames
         self.current_sheet = self.sheet_names[0]
+        self.source_col = None
+        self.target_cols = set()
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle(self.tr("Просмотр: ") + self.current_sheet)
         layout = QVBoxLayout()
 
+        self.select_all_checkbox = QCheckBox(self.tr("Выбрать все листы"))
+        self.select_all_checkbox.toggled.connect(self.toggle_all_sheets)
+        layout.addWidget(self.select_all_checkbox)
+
         self.init_sheet_selector()
         layout.addWidget(self.sheet_selector)
 
         self.table_view = QTableView(self)
+        header = ClickableHeaderView(Qt.Horizontal, self.table_view)
+        header.leftClicked.connect(self.handle_left_click)
+        header.rightClicked.connect(self.handle_right_click)
+        self.table_view.setHorizontalHeader(header)
         layout.addWidget(self.table_view)
 
         self.load_excel_data()
@@ -39,9 +66,23 @@ class ExcelPreviewer(QWidget):
         self.sheet_selector = QComboBox(self)
         self.sheet_selector.addItems(self.sheet_names)
         self.sheet_selector.currentTextChanged.connect(self.switch_sheet)
+        self.sheet_selector.setEnabled(False)
+
+    def toggle_all_sheets(self, checked):
+        self.sheet_selector.setEnabled(checked)
+        self.sheet_selector.clear()
+        if checked:
+            self.sheet_selector.addItems(self.sheet_names)
+            if self.current_sheet not in self.sheet_names:
+                self.current_sheet = self.sheet_names[0]
+            self.sheet_selector.setCurrentText(self.current_sheet)
+        else:
+            self.sheet_selector.addItem(self.current_sheet)
 
     def switch_sheet(self, sheet_name):
         self.current_sheet = sheet_name
+        self.source_col = None
+        self.target_cols.clear()
         self.load_excel_data()
 
     def load_excel_data(self):
@@ -60,6 +101,7 @@ class ExcelPreviewer(QWidget):
         model = self.create_table_model(df)
         self.table_view.setModel(model)
         self.adjust_table_headers(df)
+        self.update_colors()
 
     def create_table_model(self, df):
         model = QStandardItemModel(df.shape[0], df.shape[1])
@@ -92,6 +134,8 @@ class ExcelPreviewer(QWidget):
             new_width = min(current_width, max_width_px)
             self.table_view.setColumnWidth(col, new_width)
 
+        self.update_colors()
+
     def handle_load_error(self, error):
         QMessageBox.critical(self, self.tr("Ошибка"), self.tr("Не удалось загрузить данные с листа: ") + str(error))
         self.log_error(error)
@@ -102,3 +146,46 @@ class ExcelPreviewer(QWidget):
             log_file.write(self.tr("Ошибка: ") + str(error) + "\n")
             log_file.write(traceback.format_exc())
             log_file.write("\n")
+
+    # --- Column selection logic ---
+    def handle_left_click(self, index: int):
+        if self.source_col is None:
+            self.source_col = index
+            self.target_cols.clear()
+        else:
+            if index == self.source_col or index in self.target_cols:
+                return
+            cols = {self.source_col} | self.target_cols
+            min_idx = min(cols)
+            max_idx = max(cols)
+            if index == min_idx - 1 or index == max_idx + 1:
+                self.target_cols.add(index)
+        self.update_colors()
+
+    def handle_right_click(self, index: int):
+        if index == self.source_col:
+            self.source_col = None
+            self.target_cols.clear()
+        elif index in self.target_cols:
+            self.target_cols.remove(index)
+        else:
+            return
+        self.update_colors()
+
+    def update_colors(self):
+        model = self.table_view.model()
+        if model is None:
+            return
+        for row in range(model.rowCount()):
+            for col in range(model.columnCount()):
+                idx = model.index(row, col)
+                model.setData(idx, QBrush(QColor("white")), Qt.BackgroundRole)
+        if self.source_col is not None:
+            for row in range(model.rowCount()):
+                idx = model.index(row, self.source_col)
+                model.setData(idx, QBrush(QColor("#a2cffe")), Qt.BackgroundRole)
+        for col in self.target_cols:
+            for row in range(model.rowCount()):
+                idx = model.index(row, col)
+                model.setData(idx, QBrush(QColor("#b6fcb6")), Qt.BackgroundRole)
+
