@@ -11,7 +11,30 @@ def _is_lang_column(name: str) -> bool:
     return name.isalpha()
 
 
-def split_excel_by_languages(excel_path: str, sheet_name: str, source_lang: str, output_dir: str | None = None):
+def split_excel_by_languages(
+    excel_path: str,
+    sheet_name: str,
+    source_lang: str,
+    output_dir: str | None = None,
+    target_langs: list[str] | None = None,
+):
+    """Split Excel into language pairs.
+
+    Parameters
+    ----------
+    excel_path : str
+        Path to the source Excel file.
+    sheet_name : str
+        Name of the sheet to process.
+    source_lang : str
+        Column header that contains source text.
+    output_dir : str | None, optional
+        Directory where new files will be saved. Defaults to the Excel file
+        directory.
+    target_langs : list[str] | None, optional
+        List of target language columns to include. If ``None`` all language
+        columns are used.
+    """
     wb = load_workbook(excel_path, read_only=True)
     sheet = wb[sheet_name]
     headers = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
@@ -24,10 +47,18 @@ def split_excel_by_languages(excel_path: str, sheet_name: str, source_lang: str,
     if output_dir is None:
         output_dir = os.path.dirname(excel_path)
 
+    if target_langs:
+        missing = [t for t in target_langs if t not in header_map]
+        if missing:
+            wb.close()
+            raise ValueError(f"Target column(s) {', '.join(missing)} not found")
+
     source_idx = header_map[source_lang]
 
     for target_lang, idx in header_map.items():
         if target_lang == source_lang:
+            continue
+        if target_langs is not None and target_lang not in target_langs:
             continue
         if not _is_lang_column(target_lang):
             continue

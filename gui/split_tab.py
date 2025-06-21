@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
 from core.split_excel import split_excel_by_languages
+from gui.split_mapping_dialog import SplitMappingDialog
 from openpyxl import load_workbook
 
 
@@ -13,6 +14,8 @@ class SplitTab(QWidget):
         self.excel_path = ''
         self.sheet_name = ''
         self.headers = []
+        self.source_lang = ''
+        self.target_langs: list[str] = []
         self.init_ui()
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
@@ -32,6 +35,14 @@ class SplitTab(QWidget):
         layout.addWidget(QLabel(tr("Исходный язык:")))
         self.source_combo = QComboBox()
         layout.addWidget(self.source_combo)
+
+        self.config_btn = QPushButton(tr("Превью"))
+        self.config_btn.clicked.connect(self.open_mapping_dialog)
+        layout.addWidget(self.config_btn)
+
+        self.current_label = QLabel(tr("Текущая настройка: —"))
+        self.current_label.setWordWrap(True)
+        layout.addWidget(self.current_label)
 
         self.split_btn = QPushButton(tr("Разделить"))
         self.split_btn.clicked.connect(self.run_split)
@@ -66,13 +77,40 @@ class SplitTab(QWidget):
         self.source_combo.clear()
         self.source_combo.addItems([h for h in self.headers if h])
 
+        # reset current selection
+        self.source_lang = ''
+        self.target_langs = []
+        self.current_label.setText(tr("Текущая настройка: —"))
+
+    def open_mapping_dialog(self):
+        if not self.excel_path:
+            QMessageBox.critical(self, tr("Ошибка"), tr("Выберите файл Excel."))
+            return
+        dialog = SplitMappingDialog(self.excel_path, self.sheet_name, self)
+        if dialog.exec():
+            src, targets = dialog.get_selection()
+            if src:
+                self.source_lang = src
+                self.target_langs = targets
+                self.current_label.setText(
+                    tr("Текущая настройка: {txt}").format(
+                        txt=f"{src} -> {', '.join(targets) if targets else '—'}"
+                    )
+                )
+
     def run_split(self):
         if not self.excel_path:
             QMessageBox.critical(self, tr("Ошибка"), tr("Выберите файл Excel."))
             return
-        src = self.source_combo.currentText()
+        src = self.source_lang or self.source_combo.currentText()
+        targets = self.target_langs if self.target_langs else None
         try:
-            split_excel_by_languages(self.excel_path, self.sheet_name, src)
+            split_excel_by_languages(
+                self.excel_path,
+                self.sheet_name,
+                src,
+                target_langs=targets,
+            )
             QMessageBox.information(self, tr("Успех"), tr("Файлы успешно сохранены."))
         except Exception as e:
             QMessageBox.critical(self, tr("Ошибка"), str(e))
@@ -80,4 +118,6 @@ class SplitTab(QWidget):
     def retranslate_ui(self):
         self.setWindowTitle(tr("Разделение"))
         self.split_btn.setText(tr("Разделить"))
+        self.config_btn.setText(tr("Превью"))
+        self.current_label.setText(tr("Текущая настройка: —"))
         # update labels - they are static but to refresh we need to re-add them? Not necessary
