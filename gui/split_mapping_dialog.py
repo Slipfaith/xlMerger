@@ -34,6 +34,8 @@ class SplitMappingDialog(QDialog):
         self.models: dict[str, QStandardItemModel] = {}
         # columns that contain at least one non-empty value for each sheet
         self.non_empty_cols: dict[str, set[int]] = {}
+        # Keep track of which sheets already have preview data loaded
+        self._loaded: set[str] = set()
         self.configs = {
             name: {"src": None, "targets": set(), "extra": set()}
             for name in sheet_names
@@ -43,42 +45,55 @@ class SplitMappingDialog(QDialog):
         self.target_cols: set[int] = set()
         self.extra_cols: set[int] = set()
 
-        self._load_all_previews()
+        # Load preview data only for the first sheet. Additional sheets will be
+        # loaded lazily when the user switches to them.
+        self._load_preview(self.current_sheet)
         self._init_ui()
 
-    def _load_all_previews(self):
+    def _load_preview(self, sheet_name: str):
+        """Load preview data for a single sheet."""
+        if sheet_name in self._loaded:
+            return
+
         wb = load_workbook(self.excel_path, read_only=True)
-        for name in self.sheet_names:
-            sheet = wb[name]
-            headers = [
-                str(cell.value) if cell.value is not None else ""
-                for cell in next(sheet.iter_rows(min_row=1, max_row=1))
+        sheet = wb[sheet_name]
+        headers = [
+            str(cell.value) if cell.value is not None else ""
+            for cell in next(sheet.iter_rows(min_row=1, max_row=1))
+        ]
+        rows_for_preview = list(
+            sheet.iter_rows(min_row=2, max_row=11, values_only=True)
+        )
+        rows_for_check = list(islice(sheet.iter_rows(min_row=2, values_only=True), 30))
+
+        non_empty = {idx for idx, h in enumerate(headers) if str(h).strip() != ""}
+        if rows_for_check:
+            for idx, col in enumerate(zip(*rows_for_check)):
+                if any(v not in (None, "") for v in col):
+                    non_empty.add(idx)
+
+        keep_idx = sorted(non_empty)
+        filtered_headers = [headers[i] for i in keep_idx]
+        model = QStandardItemModel()
+        model.setHorizontalHeaderLabels(
+            [str(h) if h is not None else "" for h in filtered_headers]
+        )
+        for row in rows_for_preview:
+            filtered_row = [row[i] if i < len(row) else None for i in keep_idx]
+            items = [
+                QStandardItem(str(cell)) if cell is not None else QStandardItem("")
+                for cell in filtered_row
             ]
-            rows_for_preview = list(sheet.iter_rows(min_row=2, max_row=11, values_only=True))
-            rows_for_check = list(islice(sheet.iter_rows(min_row=2, values_only=True), 30))
+            model.appendRow(items)
 
-            non_empty = {idx for idx, h in enumerate(headers) if str(h).strip() != ""}
-            if rows_for_check:
-                for idx, col in enumerate(zip(*rows_for_check)):
-                    if any(v not in (None, "") for v in col):
-                        non_empty.add(idx)
-
-            keep_idx = sorted(non_empty)
-            filtered_headers = [headers[i] for i in keep_idx]
-            model = QStandardItemModel()
-            model.setHorizontalHeaderLabels([str(h) if h is not None else "" for h in filtered_headers])
-            for row in rows_for_preview:
-                filtered_row = [row[i] if i < len(row) else None for i in keep_idx]
-                items = [
-                    QStandardItem(str(cell)) if cell is not None else QStandardItem("")
-                    for cell in filtered_row
-                ]
-                model.appendRow(items)
-
-            self.headers_map[name] = [str(h) if h is not None else "" for h in filtered_headers]
-            self.models[name] = model
-            self.non_empty_cols[name] = set(range(len(keep_idx)))
+        self.headers_map[sheet_name] = [
+            str(h) if h is not None else "" for h in filtered_headers
+        ]
+        self.models[sheet_name] = model
+        self.non_empty_cols[sheet_name] = set(range(len(keep_idx)))
+        self._loaded.add(sheet_name)
         wb.close()
+
         self.model = self.models[self.current_sheet]
         self.headers = self.headers_map[self.current_sheet]
 
@@ -92,7 +107,9 @@ class SplitMappingDialog(QDialog):
             self.sheet_combo.currentTextChanged.connect(self.switch_sheet)
             layout.addWidget(self.sheet_combo)
 
-        info = QLabel(tr("Выбери исходный столбец (синий) и столбцы перевода (зелёный)."))
+        info = QLabel(
+            tr("Выбери исходный столбец (синий) и столбцы перевода (зелёный).")
+        )
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -154,6 +171,8 @@ class SplitMappingDialog(QDialog):
     def switch_sheet(self, name: str):
         self._save_current()
         self.current_sheet = name
+        if name not in self._loaded:
+            self._load_preview(name)
         self.model = self.models[name]
         self.headers = self.headers_map[name]
         self.table.setModel(self.model)
@@ -257,14 +276,24 @@ class SplitMappingDialog(QDialog):
             txt = f"{tr('Источник')}: —\n{tr('Цели')}: —\n{tr('Доп')}: —"
         else:
             src = self.headers[self.source_col]
-            tgts = [self.headers[c] for c in sorted(self.target_cols)] if self.target_cols else ['—']
-            extras = [self.headers[c] for c in sorted(self.extra_cols)] if self.extra_cols else ['—']
+            tgts = (
+                [self.headers[c] for c in sorted(self.target_cols)]
+                if self.target_cols
+                else ["—"]
+            )
+            extras = (
+                [self.headers[c] for c in sorted(self.extra_cols)]
+                if self.extra_cols
+                else ["—"]
+            )
             txt = (
                 f"{tr('Источник')}: {src}\n"
                 f"{tr('Цели')}: {', '.join(tgts)}\n"
                 f"{tr('Доп')}: {', '.join(extras)}"
             )
-        self.count_label.setText(tr("Выбрано таргетов: {n}").format(n=len(self.target_cols)))
+        self.count_label.setText(
+            tr("Выбрано таргетов: {n}").format(n=len(self.target_cols))
+        )
         self.current_label.setText(tr("Текущая настройка:\n{txt}").format(txt=txt))
 
     def get_selection(self):
