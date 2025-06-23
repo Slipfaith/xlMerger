@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self.retranslate_ui()
 
     def show_about(self):
-        QMessageBox.information(self, tr("About"), tr("Объединяй и проверяй\nVersion 2 25.05.2025\nslipfaith"))
+        QMessageBox.information(self, tr("About"), tr("Объединяй и проверяй\nVersion 1.0 24.06.2025\nslipfaith"))
 
     def check_updates(self):
         import subprocess
