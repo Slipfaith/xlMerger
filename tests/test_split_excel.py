@@ -126,3 +126,23 @@ def test_split_preserves_format(tmp_path):
     assert ws2.cell(row=2, column=1).fill.fgColor.rgb in {"FFFFFF00", "FFFF00"}
     wb2.close()
 
+
+def test_split_ignores_empty_trailing_rows(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(["ru", "en"])
+    ws.append(["hi", "hello"])
+    ws.row_dimensions[100].height = 15
+    wb.save(src)
+    wb.close()
+
+    split_excel_by_languages(str(src), "Sheet1", "ru")
+
+    out_file = tmp_path / "main_ru-en.xlsx"
+    wb2 = load_workbook(out_file)
+    ws2 = wb2.active
+    assert ws2.max_row == 2
+    wb2.close()
+

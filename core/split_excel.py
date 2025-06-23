@@ -33,6 +33,16 @@ def _copy_column_width(src_sheet, dst_sheet, src_idx: int, dst_idx: int):
         dst_sheet.column_dimensions[dst_letter].width = width
 
 
+def _find_last_data_row(sheet, columns: List[int]) -> int:
+    """Return the last row index that has a value in the given columns."""
+    for row_idx in range(sheet.max_row, 1, -1):
+        for col in columns:
+            val = sheet.cell(row=row_idx, column=col).value
+            if val not in (None, ""):
+                return row_idx
+    return 1
+
+
 def split_excel_by_languages(
     excel_path: str,
     sheet_name: str,
@@ -124,7 +134,8 @@ def split_excel_by_languages(
             ws_new.cell(row=1, column=col_pos).value = header
             _copy_column_width(sheet, ws_new, ex_idx, col_pos)
             col_pos += 1
-        for row in range(2, sheet.max_row + 1):
+        last_row = _find_last_data_row(sheet, [source_idx, idx, *extra_idx])
+        for row in range(2, last_row + 1):
             col_pos = 1
             _copy_cell(sheet.cell(row=row, column=source_idx), ws_new.cell(row=row, column=col_pos))
             col_pos += 1
@@ -243,7 +254,8 @@ def split_excel_multiple_sheets(
                     _copy_column_width(sheet, ws_new, ex_idx, col_pos)
                     col_pos += 1
 
-            for row in range(2, sheet.max_row + 1):
+            last_row = _find_last_data_row(sheet, [src_idx, idx, *extra_idx])
+            for row in range(2, last_row + 1):
                 col_pos = 1
                 _copy_cell(sheet.cell(row=row, column=src_idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
