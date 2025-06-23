@@ -53,13 +53,7 @@ class SplitTab(QWidget):
 
         layout.addLayout(right)
 
-        # minimal styling for buttons and widgets
-        self.setStyleSheet(
-            """
-            QWidget {font-size: 14px;}
-            QLineEdit {font-size:14px;}
-            """
-        )
+        # Use application defaults for styling to match other tabs
 
     def on_file_selected(self, path):
         """Store selected Excel path and reset mappings."""
