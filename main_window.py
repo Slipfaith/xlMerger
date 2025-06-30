@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
 from PySide6.QtGui import QAction
 from utils.i18n import tr, i18n
+from utils.updater import check_for_update
 
 from gui.file_processor_app import FileProcessorApp
 from gui.limits_checker import LimitsChecker
@@ -32,6 +33,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tab_widget)
         self.init_menu()
         self.show()
+        # Automatic update check at startup
+        self.check_updates(auto=True)
 
     def retranslate_ui(self):
         self.setWindowTitle(tr("xlMerger: объединяй и проверяй"))
@@ -85,17 +88,6 @@ class MainWindow(QMainWindow):
     def show_about(self):
         QMessageBox.information(self, tr("About"), tr("Объединяй и проверяй\nVersion 1.0 24.06.2025\nslipfaith"))
 
-    def check_updates(self):
-        import subprocess
-        import os
-        repo_dir = os.path.dirname(os.path.abspath(__file__))
-        try:
-            subprocess.run(["git", "fetch"], cwd=repo_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            local = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_dir).strip()
-            remote = subprocess.check_output(["git", "rev-parse", "@{u}"], cwd=repo_dir).strip()
-            if local != remote:
-                QMessageBox.information(self, tr("Check for Updates"), tr("A newer version is available on GitHub."))
-            else:
-                QMessageBox.information(self, tr("Check for Updates"), tr("You have the latest version."))
-        except Exception as e:
-            QMessageBox.critical(self, tr("Error"), str(e))
+    def check_updates(self, auto: bool = False):
+        """Check for application updates using PyUpdater."""
+        check_for_update(self, auto=auto)
