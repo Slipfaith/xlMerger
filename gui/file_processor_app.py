@@ -132,6 +132,7 @@ class FileProcessorApp(QWidget):
 
     # === Match Page (file/papka -> column mapping) ===
     def go_to_match_page(self):
+        self.collect_confirmation_changes()
         self.page_match = MatchPage(
             self.folder_path,
             self.selected_files,
@@ -139,6 +140,7 @@ class FileProcessorApp(QWidget):
             self.columns,
             self.file_to_column,
             self.folder_to_column,
+            preserve_formatting=self.preserve_formatting,
         )
         self.page_match.backClicked.connect(self.go_to_sheet_column_page)
         self.page_match.nextClicked.connect(self.handle_match_selected)
@@ -153,6 +155,15 @@ class FileProcessorApp(QWidget):
         self.preserve_formatting = preserve_formatting
         self.go_to_confirmation_page()
 
+    def collect_confirmation_changes(self):
+        if hasattr(self, "page_confirmation") and self.page_confirmation:
+            mapping = self.page_confirmation.get_current_mapping()
+            if self.file_to_column:
+                self.file_to_column = mapping
+            else:
+                self.folder_to_column = mapping
+            self.preserve_formatting = self.page_confirmation.is_format_preserved()
+
     # === Confirmation Page ===
     def get_sorted_items(self):
         # Теперь значения — это строки (названия колонок)
@@ -163,7 +174,12 @@ class FileProcessorApp(QWidget):
 
     def go_to_confirmation_page(self):
         items = self.get_sorted_items()
-        self.page_confirmation = ConfirmPage(items)
+        all_columns = [
+            col for sheet in self.selected_sheets for col in self.columns[sheet]
+            if isinstance(col, str) and col.strip()
+        ]
+        available = sorted(set(all_columns))
+        self.page_confirmation = ConfirmPage(items, available, self.preserve_formatting)
         self.page_confirmation.backClicked.connect(self.go_to_match_page)
         self.page_confirmation.startClicked.connect(self.start_copying)
         self.stack.addWidget(self.page_confirmation)
@@ -315,9 +331,10 @@ class FileProcessorApp(QWidget):
     # === Копирование ===
     def start_copying(self):
         try:
+            self.collect_confirmation_changes()
             self.go_to_progress_page()
-            file_to_column = dict(self.file_to_column) if self.file_to_column else {}
-            folder_to_column = dict(self.folder_to_column) if self.folder_to_column else {}
+            file_to_column = {os.path.basename(k): v for k, v in self.file_to_column.items()} if self.file_to_column else {}
+            folder_to_column = {os.path.basename(k): v for k, v in self.folder_to_column.items()} if self.folder_to_column else {}
             folder_path = self.folder_path if folder_to_column else ''
 
             processor = ExcelProcessor(
