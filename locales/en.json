@@ -116,6 +116,7 @@
   "Сопоставь папки с колонками:": "Match folders to columns:",
   "Сохранить настройки": "Save settings",
   "Сохранённые сопоставления:": "Saved mappings:",
+  "Копировать с сохранением форматирования": "Copy with formatting",
   "Столбец": "Column",
   "Столбец '{column_name}' не найден на листе '{sheet_name}": "Столбец '{column_name}' не найден на листе '{sheet_name}",
   "Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel.": "Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel.",
