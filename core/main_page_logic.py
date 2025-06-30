@@ -122,6 +122,9 @@ class MainPageLogic(QObject):
         if not excel_file_path or not os.path.isfile(excel_file_path):
             QMessageBox.critical(self.ui, "Ошибка", "Указанный файл Excel не существует.")
             return False
+        if not copy_column:
+            QMessageBox.critical(self.ui, "Ошибка", "Укажи столбец для копирования.")
+            return False
         if not selected_sheets:
             QMessageBox.critical(self.ui, "Ошибка", "Выбери хотя бы один лист.")
             return False
