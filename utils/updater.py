@@ -1,40 +1,64 @@
-import appdirs
-from pyupdater.client import Client
+import os
+import requests
+import tempfile
+import webbrowser
 from PySide6.QtWidgets import QMessageBox
-
 from utils.i18n import tr
 from __init__ import __version__
 
+GITHUB_API_LATEST = "https://api.github.com/repos/{owner}/{repo}/releases/latest"
+REPO_OWNER = "yourusername"
+REPO_NAME = "xlMerger"
 
-class ClientConfig(object):
-    APP_NAME = "xlMerger"
-    COMPANY_NAME = "xlMerger"
-    UPDATE_URLS = [
-        "https://github.com/yourusername/xlMerger/releases/download/"
-    ]
-    PUBLIC_KEY = ""  # Add your public key here when using signing
-    DATA_DIR = appdirs.user_data_dir(APP_NAME, COMPANY_NAME)
+
+def get_latest_release():
+    url = GITHUB_API_LATEST.format(owner=REPO_OWNER, repo=REPO_NAME)
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def compare_versions(current: str, latest: str) -> bool:
+    def normalize(v):
+        return [int(x) for x in v.strip('v').split('.') if x.isdigit()]
+    return normalize(latest) > normalize(current)
+
+
+def download_asset(url: str, name: str) -> str:
+    path = os.path.join(tempfile.gettempdir(), name)
+    with requests.get(url, stream=True, timeout=10) as r:
+        r.raise_for_status()
+        with open(path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+    return path
 
 
 def check_for_update(parent, auto=False):
     try:
-        client = Client(ClientConfig(), refresh=True)
-        app_update = client.update_check(ClientConfig.APP_NAME, __version__)
-        if app_update:
+        data = get_latest_release()
+        latest_version = data.get("tag_name", "").lstrip('v')
+        if latest_version and compare_versions(__version__, latest_version):
             if QMessageBox.question(
                 parent,
                 tr("Update Available"),
                 tr("A newer version is available. Download?"),
                 QMessageBox.Yes | QMessageBox.No,
             ) == QMessageBox.Yes:
-                app_update.download()
-                if app_update.is_downloaded():
+                asset = next(
+                    (a for a in data.get("assets", []) if a["name"].endswith(".exe")),
+                    None,
+                )
+                if asset:
+                    file_path = download_asset(asset["browser_download_url"], asset["name"])
                     QMessageBox.information(
                         parent,
-                        tr("Update Downloaded"),
-                        tr("Update downloaded. Restart application to install."),
+                        tr("Downloaded"),
+                        tr("Installer downloaded to {path}. Run it to update.").format(path=file_path),
                     )
-                    app_update.extract_restart()
+                else:
+                    webbrowser.open(data.get("html_url"))
         else:
             if not auto:
                 QMessageBox.information(
