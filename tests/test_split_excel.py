@@ -2,7 +2,6 @@ import os
 from openpyxl import Workbook, load_workbook
 from core.split_excel import split_excel_by_languages, split_excel_multiple_sheets
 
-
 def test_split_excel(tmp_path):
     src = tmp_path / "main.xlsx"
     wb = Workbook()
@@ -36,7 +35,6 @@ def test_split_excel(tmp_path):
     assert ws_en.cell(row=2, column=2).value == "hello"
     wb_en.close()
 
-
 def test_split_excel_with_targets(tmp_path):
     src = tmp_path / "main.xlsx"
     wb = Workbook()
@@ -54,7 +52,6 @@ def test_split_excel_with_targets(tmp_path):
 
     assert out_de.is_file()
     assert not out_en.exists()
-
 
 def test_split_excel_with_non_language_target(tmp_path):
     src = tmp_path / "main.xlsx"
@@ -75,7 +72,6 @@ def test_split_excel_with_non_language_target(tmp_path):
 
     out_custom = tmp_path / "main_ru-English Text.xlsx"
     assert out_custom.is_file()
-
 
 def test_split_excel_multiple_sheets(tmp_path):
     src = tmp_path / "main.xlsx"
@@ -103,7 +99,6 @@ def test_split_excel_multiple_sheets(tmp_path):
     assert set(out_wb.sheetnames) == {"S1", "S2"}
     out_wb.close()
 
-
 def test_split_preserves_format(tmp_path):
     src = tmp_path / "main.xlsx"
     wb = Workbook()
@@ -123,9 +118,12 @@ def test_split_preserves_format(tmp_path):
     wb2 = load_workbook(out_file)
     ws2 = wb2.active
     assert ws2.cell(row=2, column=1).font.bold is True
-    assert ws2.cell(row=2, column=1).fill.fgColor.rgb in {"FFFFFF00", "FFFF00"}
-    wb2.close()
 
+    # Исправленная проверка цвета
+    fill = ws2.cell(row=2, column=1).fill.fgColor.rgb
+    assert fill is not None
+    assert fill.upper().endswith("FFFF00")
+    wb2.close()
 
 def test_split_ignores_empty_trailing_rows(tmp_path):
     src = tmp_path / "main.xlsx"
@@ -145,4 +143,3 @@ def test_split_ignores_empty_trailing_rows(tmp_path):
     ws2 = wb2.active
     assert ws2.max_row == 2
     wb2.close()
-

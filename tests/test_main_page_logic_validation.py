@@ -1,34 +1,84 @@
+import sys
 import pytest
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QApplication, QWidget, QMessageBox
 from core.main_page_logic import MainPageLogic
-from PySide6.QtWidgets import QWidget
+
+@pytest.fixture(scope="session")
+def qapp():
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    return app
+
+class DummyEntry:
+    def __init__(self, value=""):
+        self._value = value
+    def text(self):
+        return self._value
+    def setText(self, v):
+        self._value = v
+
+class DummySheetList:
+    def __init__(self, count=0, checked=True, names=None):
+        self._count = count
+        self._checked = checked
+        self._names = names or []
+    def count(self):
+        return self._count
+    def item(self, i):
+        class DummyItem:
+            def checkState(self):  # 2 = Qt.Checked
+                return 2 if self._checked else 0
+            def text(self):
+                return self._names[i] if self._names else "Sheet1"
+        item = DummyItem()
+        item._checked = self._checked
+        item._names = self._names
+        return item
+    def clear(self):
+        self._count = 0
+        self._names = []
 
 class DummyUI(QWidget):
+    folderSelected = Signal(str)
+    filesSelected = Signal(list)
+    excelFileSelected = Signal(str)
+    processTriggered = Signal()
+    previewTriggered = Signal()
+
     def __init__(self):
         super().__init__()
-        self.folder_entry = type('', (), {'text': lambda s: "", 'setText': lambda s, v: None})()
-        self.excel_file_entry = type('', (), {'text': lambda s: "", 'setText': lambda s, v: None})()
-        self.copy_column_entry = type('', (), {'text': lambda s: "", 'setText': lambda s, v: None})()
-        self.sheet_list = type('', (), {'count': lambda s: 0, 'item': lambda s, i: None})()
+        self.folder_entry = DummyEntry()
+        self.excel_file_entry = DummyEntry()
+        self.copy_column_entry = DummyEntry()
+        self.sheet_list = DummySheetList()
 
-def test_main_page_logic_validation(monkeypatch):
+def test_main_page_logic_validation(qapp, monkeypatch, tmp_path):
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: QMessageBox.Ok)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: QMessageBox.Ok)
+
     ui = DummyUI()
     logic = MainPageLogic(ui)
 
-    # Нет файлов и папок — не валидно
+    # Нет файлов/папок — не валидно
     assert not logic.validate_inputs()
 
-    # Пробросим валидные значения
-    monkeypatch.setattr(ui.folder_entry, "text", lambda: "/tmp")
-    monkeypatch.setattr(ui.excel_file_entry, "text", lambda: "/tmp/file.xlsx")
-    monkeypatch.setattr(ui.copy_column_entry, "text", lambda: "A")
+    # Валидные значения: папка существует, файл существует и лист с нужным именем
+    folder = tmp_path
+    file_path = tmp_path / "file.xlsx"
 
-    class DummyItem:
-        def checkState(self):
-            return 2  # Qt.Checked
-        def text(self):
-            return "Sheet1"
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"   # Имя листа ДОЛЖНО совпадать с names=["Sheet1"]
+    ws.append(["A", "B"])
+    wb.save(file_path)
+    wb.close()
 
-    monkeypatch.setattr(ui.sheet_list, "count", lambda: 1)
-    monkeypatch.setattr(ui.sheet_list, "item", lambda s, i: DummyItem())
+    ui.folder_entry.setText(str(folder))
+    ui.excel_file_entry.setText(str(file_path))
+    ui.copy_column_entry.setText("A")
+    ui.sheet_list = DummySheetList(count=1, checked=True, names=["Sheet1"])
 
     assert logic.validate_inputs()
