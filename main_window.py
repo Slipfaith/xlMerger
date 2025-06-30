@@ -89,5 +89,5 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, tr("About"), tr("Объединяй и проверяй\nVersion 1.0 24.06.2025\nslipfaith"))
 
     def check_updates(self, auto: bool = False):
-        """Check for application updates using PyUpdater."""
+        """Check for application updates via GitHub Releases."""
         check_for_update(self, auto=auto)
