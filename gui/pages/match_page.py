@@ -1,7 +1,7 @@
 import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGridLayout, QComboBox,
-    QPushButton, QHBoxLayout
+    QPushButton, QHBoxLayout, QCheckBox
 )
 from PySide6.QtCore import Signal, Qt
 from utils.i18n import tr, i18n
@@ -9,7 +9,7 @@ from utils.i18n import tr, i18n
 
 class MatchPage(QWidget):
     backClicked = Signal()
-    nextClicked = Signal(dict, dict)
+    nextClicked = Signal(dict, dict, bool)
     saveClicked = Signal()
     loadClicked = Signal()
 
@@ -136,6 +136,11 @@ class MatchPage(QWidget):
             self.folder_to_column_widgets = {}
 
         layout.addWidget(scroll_area)
+
+        self.format_checkbox = QCheckBox(tr("Копировать с сохранением форматирования"))
+        self.format_checkbox.setChecked(False)
+        self.format_checkbox.setStyleSheet("QCheckBox { padding: 4px; }")
+        layout.addWidget(self.format_checkbox)
 
         button_layout = QHBoxLayout()
         self.save_button = QPushButton(tr("Сохранить настройки"))
@@ -264,7 +269,8 @@ class MatchPage(QWidget):
         elif self._is_folder_mapping:
             for k, v in self.folder_to_column_widgets.items():
                 folder_to_column[k] = v.currentText()
-        self.nextClicked.emit(file_to_column, folder_to_column)
+        preserve = self.format_checkbox.isChecked()
+        self.nextClicked.emit(file_to_column, folder_to_column, preserve)
 
     def retranslate_ui(self):
         self.setWindowTitle(tr("Сопоставление"))
@@ -274,3 +280,4 @@ class MatchPage(QWidget):
         self.load_button.setText(tr("Загрузить настройки"))
         self.back_button.setText(tr("Назад"))
         self.next_button.setText(tr("Далее"))
+        self.format_checkbox.setText(tr("Копировать с сохранением форматирования"))

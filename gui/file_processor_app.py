@@ -55,6 +55,7 @@ class FileProcessorApp(QWidget):
         self.file_to_sheet_map = {}
         self.skip_first_row = False
         self.copy_by_row_number = False
+        self.preserve_formatting = False
         self.progress_bar = None
 
         self.settings = QSettings('xlMerger', 'xlMerger')
@@ -146,9 +147,10 @@ class FileProcessorApp(QWidget):
         self.stack.addWidget(self.page_match)
         self.stack.setCurrentWidget(self.page_match)
 
-    def handle_match_selected(self, file_to_column, folder_to_column):
+    def handle_match_selected(self, file_to_column, folder_to_column, preserve_formatting):
         self.file_to_column = file_to_column
         self.folder_to_column = folder_to_column
+        self.preserve_formatting = preserve_formatting
         self.go_to_confirmation_page()
 
     # === Confirmation Page ===
@@ -329,7 +331,8 @@ class FileProcessorApp(QWidget):
                 folder_to_column=folder_to_column,
                 file_to_sheet_map=self.file_to_sheet_map,
                 skip_first_row=self.skip_first_row,
-                copy_by_row_number=self.copy_by_row_number
+                copy_by_row_number=self.copy_by_row_number,
+                preserve_formatting=self.preserve_formatting
             )
 
             def progress_callback(progress, total):

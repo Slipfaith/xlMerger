@@ -3,6 +3,7 @@ import hashlib
 from openpyxl import load_workbook
 import openpyxl.utils as utils
 from openpyxl.styles import PatternFill
+from copy import copy as copy_style
 
 from utils.logger import Logger
 
@@ -10,7 +11,8 @@ class ExcelProcessor:
     def __init__(
         self, main_excel_path, folder_path, copy_column, selected_sheets,
         sheet_to_header_row, sheet_to_column, file_to_column=None, folder_to_column=None,
-        file_to_sheet_map=None, skip_first_row=False, copy_by_row_number=False, logger=None
+        file_to_sheet_map=None, skip_first_row=False, copy_by_row_number=False,
+        preserve_formatting=False, logger=None
     ):
         self.main_excel_path = main_excel_path
         self.folder_path = folder_path
@@ -23,6 +25,7 @@ class ExcelProcessor:
         self.file_to_sheet_map = file_to_sheet_map or {}
         self.skip_first_row = skip_first_row
         self.copy_by_row_number = copy_by_row_number
+        self.preserve_formatting = preserve_formatting
 
         self.workbook = None
         self.columns = {}
@@ -164,9 +167,10 @@ class ExcelProcessor:
             else:
                 offset = 2 if self.skip_first_row else 1
                 target_row = header_row + offset + (row - offset)
-            self._set_cell(sheet_name, target_row, col_index, source_value)
+            source_cell = lang_sheet.cell(row=row, column=copy_col_index)
+            self._set_cell(sheet_name, target_row, col_index, source_value, source_cell)
 
-    def _set_cell(self, sheet_name, target_row, col_index, value):
+    def _set_cell(self, sheet_name, target_row, col_index, value, source_cell=None):
         target_cell = self.workbook[sheet_name].cell(row=target_row, column=col_index)
         def compute_hash(text):
             if text is None:
@@ -176,6 +180,13 @@ class ExcelProcessor:
         max_attempts = 5
         for attempt in range(max_attempts):
             target_cell.value = value
+            if self.preserve_formatting and source_cell is not None:
+                target_cell.font = copy_style(source_cell.font)
+                target_cell.border = copy_style(source_cell.border)
+                target_cell.fill = copy_style(source_cell.fill)
+                target_cell.number_format = source_cell.number_format
+                target_cell.protection = copy_style(source_cell.protection)
+                target_cell.alignment = copy_style(source_cell.alignment)
             if value == target_cell.value and compute_hash(target_cell.value) == source_hash:
                 # Успешно скопировано — логируем
                 self.logger.log_copy(sheet_name, target_row, col_index, value)
