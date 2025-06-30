@@ -163,5 +163,7 @@
   "Сохранение...": "Saving...",
   "Прогресс": "Progress",
   "Сохраняется: {name}": "Saving: {name}",
-  "Пустая колонка, мы ее выделять не будем": "Empty column cannot be selected"
+  "Пустая колонка, мы ее выделять не будем": "Empty column cannot be selected",
+  "Сопоставление листов": "Sheet mapping",
+  "Листы не совпадают. Выберите соответствия.": "Sheets do not match. Please choose mapping."
 }

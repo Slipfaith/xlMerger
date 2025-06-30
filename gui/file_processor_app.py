@@ -15,6 +15,7 @@ from gui.pages.sheet_column_page import SheetColumnPage
 from gui.pages.match_page import MatchPage
 from gui.pages.confirm_page import ConfirmPage
 from gui.pages.progress_page import ProgressPage
+from gui.sheet_mapping_dialog import SheetMappingDialog
 from core.main_page_logic import MainPageLogic
 from core.excel_processor import ExcelProcessor
 from gui.pages.header_row_page import HeaderRowPage
@@ -51,6 +52,7 @@ class FileProcessorApp(QWidget):
         self.sheet_to_column = {}
         self.folder_to_column = {}
         self.file_to_column = {}
+        self.file_to_sheet_map = {}
         self.skip_first_row = False
         self.copy_by_row_number = False
         self.progress_bar = None
@@ -81,6 +83,9 @@ class FileProcessorApp(QWidget):
         if not self.copy_column:
             QMessageBox.warning(self, tr("Error"), tr("Укажи столбец для копирования."))
             return  # НЕ переходим дальше
+
+        if not self.check_sheet_mapping():
+            return
 
         self.go_to_header_page()
 
@@ -266,6 +271,45 @@ class FileProcessorApp(QWidget):
                 if index != -1:
                     combobox_dict[name].setCurrentIndex(index)
 
+    def check_sheet_mapping(self):
+        """Verify sheet names in selected files and ask user to map if needed."""
+        files = self.selected_files
+        if not files:
+            return True
+
+        main_sheets = self.selected_sheets
+        file_to_sheets = {}
+        mismatched = False
+        for f in files:
+            try:
+                sheets = ExcelProcessor.get_sheet_names(f)
+            except Exception as e:
+                QMessageBox.critical(self, tr("Error"), str(e))
+                return False
+            file_to_sheets[f] = sheets
+            for ms in main_sheets:
+                if ms not in sheets:
+                    mismatched = True
+
+        if not mismatched:
+            self.file_to_sheet_map = {f: {ms: ms for ms in main_sheets} for f in files}
+            return True
+
+        auto_map = {}
+        for f, sheets in file_to_sheets.items():
+            auto_map[f] = {}
+            for ms in main_sheets:
+                if ms in sheets:
+                    auto_map[f][ms] = ms
+                elif len(sheets) == 1:
+                    auto_map[f][ms] = sheets[0]
+
+        dialog = SheetMappingDialog(main_sheets, file_to_sheets, auto_map, self)
+        if dialog.exec():
+            self.file_to_sheet_map = dialog.get_mapping()
+            return True
+        return False
+
     # === Копирование ===
     def start_copying(self):
         try:
@@ -283,6 +327,7 @@ class FileProcessorApp(QWidget):
                 sheet_to_column={k: v.text() if hasattr(v, "text") else v for k, v in self.sheet_to_column.items()},
                 file_to_column=file_to_column,
                 folder_to_column=folder_to_column,
+                file_to_sheet_map=self.file_to_sheet_map,
                 skip_first_row=self.skip_first_row,
                 copy_by_row_number=self.copy_by_row_number
             )

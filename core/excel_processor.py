@@ -10,7 +10,7 @@ class ExcelProcessor:
     def __init__(
         self, main_excel_path, folder_path, copy_column, selected_sheets,
         sheet_to_header_row, sheet_to_column, file_to_column=None, folder_to_column=None,
-        skip_first_row=False, copy_by_row_number=False, logger=None
+        file_to_sheet_map=None, skip_first_row=False, copy_by_row_number=False, logger=None
     ):
         self.main_excel_path = main_excel_path
         self.folder_path = folder_path
@@ -20,6 +20,7 @@ class ExcelProcessor:
         self.sheet_to_column = sheet_to_column
         self.file_to_column = file_to_column or {}
         self.folder_to_column = folder_to_column or {}
+        self.file_to_sheet_map = file_to_sheet_map or {}
         self.skip_first_row = skip_first_row
         self.copy_by_row_number = copy_by_row_number
 
@@ -115,7 +116,11 @@ class ExcelProcessor:
         self.workbook.close()
         return output_file
 
-    def _find_matching_sheet(self, lang_wb, main_sheet_name):
+    def _find_matching_sheet(self, lang_wb, main_sheet_name, file_path=None):
+        if file_path:
+            mapping = self.file_to_sheet_map.get(file_path, {}).get(main_sheet_name)
+            if mapping and mapping in lang_wb.sheetnames:
+                return mapping
         if main_sheet_name in lang_wb.sheetnames:
             return main_sheet_name
         elif len(lang_wb.sheetnames) == 1:
@@ -132,7 +137,7 @@ class ExcelProcessor:
     def _copy_from_file(self, file_path, main_sheet_name, copy_col_index, header_row, col_index):
         if os.path.isfile(file_path) and file_path.endswith(('.xlsx', '.xls')):
             lang_wb = load_workbook(file_path)
-            target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name)
+            target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
             lang_sheet = lang_wb[target_sheet_name]
             self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
             lang_wb.close()
@@ -142,7 +147,7 @@ class ExcelProcessor:
             file_path = os.path.join(lang_folder_path, filename)
             if os.path.isfile(file_path) and filename.endswith(('.xlsx', '.xls')):
                 lang_wb = load_workbook(file_path)
-                target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name)
+                target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
                 lang_sheet = lang_wb[target_sheet_name]
                 self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
                 lang_wb.close()
