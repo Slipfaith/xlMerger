@@ -20,7 +20,8 @@ class MatchPage(QWidget):
             selected_sheets,
             columns,
             file_to_column=None,
-            folder_to_column=None
+            folder_to_column=None,
+            preserve_formatting=False
     ):
         super().__init__()
         self.setWindowTitle(tr("Сопоставление"))
@@ -30,6 +31,7 @@ class MatchPage(QWidget):
         self.columns = columns
         self.file_to_column = {os.path.abspath(k): v for k, v in (file_to_column or {}).items()}
         self.folder_to_column = {os.path.abspath(k): v for k, v in (folder_to_column or {}).items()}
+        self._preserve_formatting = preserve_formatting
 
         self._all_comboboxes = []
         self._combobox_keys = []
@@ -138,7 +140,7 @@ class MatchPage(QWidget):
         layout.addWidget(scroll_area)
 
         self.format_checkbox = QCheckBox(tr("Копировать с сохранением форматирования"))
-        self.format_checkbox.setChecked(False)
+        self.format_checkbox.setChecked(self._preserve_formatting)
         self.format_checkbox.setStyleSheet("QCheckBox { padding: 4px; }")
         layout.addWidget(self.format_checkbox)
 
@@ -243,8 +245,17 @@ class MatchPage(QWidget):
         # Для файлов (если такая логика вообще используется)
         if file_to_column and hasattr(self, 'file_to_column_widgets'):
             for k, combo in self.file_to_column_widgets.items():
-                shortname = os.path.splitext(os.path.basename(k))[0]
-                val = file_to_column.get(shortname)
+                keys = [
+                    k,
+                    os.path.abspath(k),
+                    os.path.basename(k),
+                    os.path.splitext(os.path.basename(k))[0],
+                ]
+                val = None
+                for key in keys:
+                    if key in file_to_column:
+                        val = file_to_column[key]
+                        break
                 if combo and val is not None:
                     idx = combo.findText(val)
                     if idx != -1:
@@ -252,8 +263,16 @@ class MatchPage(QWidget):
         # Для папок
         if folder_to_column and hasattr(self, 'folder_to_column_widgets'):
             for k, combo in self.folder_to_column_widgets.items():
-                basename = os.path.basename(k)
-                val = folder_to_column.get(basename)
+                keys = [
+                    k,
+                    os.path.abspath(k),
+                    os.path.basename(k),
+                ]
+                val = None
+                for key in keys:
+                    if key in folder_to_column:
+                        val = folder_to_column[key]
+                        break
                 if combo and val is not None:
                     idx = combo.findText(val)
                     if idx != -1:
@@ -271,6 +290,9 @@ class MatchPage(QWidget):
                 folder_to_column[k] = v.currentText()
         preserve = self.format_checkbox.isChecked()
         self.nextClicked.emit(file_to_column, folder_to_column, preserve)
+
+    def is_format_preserved(self):
+        return self.format_checkbox.isChecked()
 
     def retranslate_ui(self):
         self.setWindowTitle(tr("Сопоставление"))
