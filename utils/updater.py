@@ -1,9 +1,13 @@
 import os
 import sys
+import subprocess
 import requests
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QProgressDialog, QApplication
+from PySide6.QtCore import Qt
 from utils.i18n import tr
 from __init__ import __version__
+
+pending_update = None
 
 GITHUB_API_LATEST = "https://api.github.com/repos/Slipfaith/xlMerger/releases/latest"
 
@@ -28,7 +32,55 @@ def download_asset(url: str, name: str) -> str:
                     f.write(chunk)
     return path
 
+def _run_update_script(old_exe: str, new_exe: str):
+    if os.name != "nt":
+        try:
+            if os.path.exists(old_exe):
+                os.remove(old_exe)
+        except PermissionError:
+            pass
+        os.replace(new_exe, old_exe)
+        return
+
+    script_path = os.path.join(os.path.dirname(new_exe), "update.bat")
+    script = (
+        f"@echo off\n"
+        f"set new=\"{new_exe}\"\n"
+        f"set old=\"{old_exe}\"\n"
+        f":loop\n"
+        f"del %old% >nul 2>&1\n"
+        f"if exist %old% (\n"
+        f"  ping 127.0.0.1 -n 2 >nul\n"
+        f"  goto loop\n"
+        f")\n"
+        f"move /Y %new% %old%\n"
+        f"del %~f0\n"
+    )
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(script)
+    subprocess.Popen(["cmd", "/c", "start", "", script_path], shell=True)
+
+def _schedule_update_on_exit(new_exe: str):
+    global pending_update
+    pending_update = new_exe
+    app = QApplication.instance()
+    if app is not None:
+        def _on_quit():
+            global pending_update
+            if pending_update:
+                _run_update_script(sys.argv[0], pending_update)
+                pending_update = None
+        app.aboutToQuit.connect(_on_quit)
+
 def check_for_update(parent, auto=False):
+    progress = QProgressDialog(
+        tr("Checking for updates..."), "", 0, 0, parent
+    )
+    progress.setWindowTitle(tr("Update"))
+    progress.setCancelButton(None)
+    progress.setWindowModality(Qt.ApplicationModal)
+    progress.show()
+    QApplication.processEvents()
     try:
         data = get_latest_release()
         latest_version = data.get("tag_name", "").lstrip('v')
@@ -43,31 +95,24 @@ def check_for_update(parent, auto=False):
 
             new_exe_name = "xlMerger_new.exe"
             file_path = download_asset(asset["browser_download_url"], new_exe_name)
-
             answer = QMessageBox.question(
                 parent,
-                "Update Available",
-                f"A new version {latest_version} is available.\n"
-                f"The update has been downloaded as {new_exe_name} in the application folder.\n\n"
-                "Update now?\n\n"
-                "If you click Yes, the app will close. Please launch the new version manually.",
+                tr("Update Available"),
+                f"{tr('A new version')} {latest_version} {tr('is available.')}\n"
+                f"{tr('The update has been downloaded as')} {new_exe_name}.\n\n"
+                f"{tr('Update now?')}",
                 QMessageBox.Yes | QMessageBox.No,
             )
             if answer == QMessageBox.Yes:
-                QMessageBox.information(
-                    parent,
-                    "Updating",
-                    f"The application will now close.\n\n"
-                    f"Please start {new_exe_name} manually.\n"
-                    "You can delete the old file after updating."
-                )
-                sys.exit(0)
+                _run_update_script(sys.argv[0], file_path)
+                QApplication.instance().quit()
             else:
                 QMessageBox.information(
                     parent,
-                    "Update Deferred",
-                    f"You can update later by launching {new_exe_name} from the app folder.",
+                    tr("Update Deferred"),
+                    tr("The update will be installed after you close the program."),
                 )
+                _schedule_update_on_exit(file_path)
         else:
             if not auto:
                 QMessageBox.information(
@@ -78,3 +123,5 @@ def check_for_update(parent, auto=False):
     except Exception as e:
         if not auto:
             QMessageBox.critical(parent, "Update Error", str(e))
+    finally:
+        progress.close()
