@@ -6,6 +6,7 @@ from utils.updater import check_for_update
 from .file_processor_app import FileProcessorApp
 from .limits_checker import LimitsChecker
 from .split_tab import SplitTab
+from .merge_tab import MergeTab
 from PySide6.QtGui import QIcon
 
 class MainWindow(QMainWindow):
@@ -30,6 +31,10 @@ class MainWindow(QMainWindow):
         # Tab renamed from "Разделение" to "xlSpliter"
         self.tab_widget.addTab(self.split_tab_widget, tr("xlSpliter"))
 
+        # Вкладка для объединения Excel
+        self.merge_tab_widget = MergeTab()
+        self.tab_widget.addTab(self.merge_tab_widget, tr("Объединить"))
+
         self.setCentralWidget(self.tab_widget)
         self.init_menu()
         self.show()
@@ -46,6 +51,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(0, tr("xlMerger"))
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
+        self.tab_widget.setTabText(3, tr("Объединить"))
         self.update_action.setText(tr("Check for Updates"))
 
     def init_menu(self):
