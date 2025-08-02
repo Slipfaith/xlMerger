@@ -3,10 +3,16 @@
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=[
+        'main_window',
+        'utils.i18n',
+        'utils.updater',
+        'utils.logger',
+        'utils.utils',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -22,7 +28,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='main',
+    name='xlMerger',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -35,5 +41,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['E:\\PythonProjects\\xlM_2.0\\xlM2.0.ico'],
+    icon=['xlM2.0.ico'],
 )
