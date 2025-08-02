@@ -15,13 +15,12 @@ def qapp():
     return app
 
 
-def test_add_rows_from_files(qapp, tmp_path):
+def test_handle_files_selected(qapp, tmp_path):
     tab = MergeTab()
     files = []
     for i in range(2):
         p = tmp_path / f"f{i}.xlsx"
         p.write_text("")
         files.append(str(p))
-    tab.add_rows_from_files(files)
-    assert len(tab.rows) == 2
-    assert [row.file_input.text() for row in tab.rows] == files
+    tab.handle_files_selected(files)
+    assert tab.source_files == files
