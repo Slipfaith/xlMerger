@@ -1,6 +1,5 @@
-import json
-import os
 from PySide6.QtCore import QObject, Signal, QSettings
+from translations import TRANSLATIONS
 
 
 class I18N(QObject):
@@ -10,16 +9,12 @@ class I18N(QObject):
         super().__init__()
         self.settings = QSettings("xlMerger", "xlMerger")
         self.language = self.settings.value("language", "ru")
-        self.translations = {}
-        self.load(self.language)
+        if self.language not in TRANSLATIONS:
+            self.language = "ru"
+        self.translations = TRANSLATIONS.get(self.language, {})
 
     def load(self, lang: str):
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'locales', f'{lang}.json')
-        if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                self.translations = json.load(f)
-        else:
-            self.translations = {}
+        self.translations = TRANSLATIONS.get(lang, {})
         self.language = lang
 
     def translate(self, text: str) -> str:
