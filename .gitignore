@@ -4,6 +4,9 @@ __pycache__/
 *.log
 *.DS_Store
 *.env
+*.spec
+*.ico
+*.zip
 *.xlsx
 *.xls
 *.json
