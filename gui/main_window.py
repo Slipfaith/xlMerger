@@ -3,9 +3,9 @@ from PySide6.QtGui import QAction
 from utils.i18n import tr, i18n
 from utils.updater import check_for_update
 
-from gui.file_processor_app import FileProcessorApp
-from gui.limits_checker import LimitsChecker
-from gui.split_tab import SplitTab
+from .file_processor_app import FileProcessorApp
+from .limits_checker import LimitsChecker
+from .split_tab import SplitTab
 from PySide6.QtGui import QIcon
 
 class MainWindow(QMainWindow):

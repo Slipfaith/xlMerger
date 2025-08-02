@@ -1,6 +1,5 @@
 from PySide6.QtCore import QObject, Signal, QSettings
-from translations import TRANSLATIONS
-
+from .translations import TRANSLATIONS
 
 class I18N(QObject):
     language_changed = Signal(str)
