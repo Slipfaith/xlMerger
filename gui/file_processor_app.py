@@ -12,7 +12,7 @@ from utils.i18n import tr, i18n
 
 from gui.main_page import MainPageWidget
 from gui.pages.sheet_column_page import SheetColumnPage
-from gui.pages.match_page import MatchPage
+from gui.mapping_settings_dialog import MappingSettingsDialog
 from gui.pages.confirm_page import ConfirmPage
 from gui.pages.progress_page import ProgressPage
 from gui.sheet_mapping_dialog import SheetMappingDialog
@@ -133,21 +133,21 @@ class FileProcessorApp(QWidget):
     # === Match Page (file/papka -> column mapping) ===
     def go_to_match_page(self):
         self.collect_confirmation_changes()
-        self.page_match = MatchPage(
+        dialog = MappingSettingsDialog(
             self.folder_path,
             self.selected_files,
             self.selected_sheets,
             self.columns,
-            self.file_to_column,
-            self.folder_to_column,
+            file_to_column=self.file_to_column,
+            folder_to_column=self.folder_to_column,
             preserve_formatting=self.preserve_formatting,
+            parent=self,
         )
-        self.page_match.backClicked.connect(self.go_to_sheet_column_page)
-        self.page_match.nextClicked.connect(self.handle_match_selected)
-        self.page_match.saveClicked.connect(self.save_mapping_settings)
-        self.page_match.loadClicked.connect(self.load_mapping_settings)
-        self.stack.addWidget(self.page_match)
-        self.stack.setCurrentWidget(self.page_match)
+        dialog.saveClicked.connect(self.save_mapping_settings)
+        dialog.loadClicked.connect(lambda: self.load_mapping_settings(dialog))
+        if dialog.exec():
+            file_to_column, folder_to_column, preserve_formatting = dialog.get_mapping()
+            self.handle_match_selected(file_to_column, folder_to_column, preserve_formatting)
 
     def handle_match_selected(self, file_to_column, folder_to_column, preserve_formatting):
         self.file_to_column = file_to_column
@@ -218,15 +218,8 @@ class FileProcessorApp(QWidget):
         self.stack.setCurrentWidget(self.page_main)
 
     # === Save/Load Mapping ===
-    def save_mapping_settings(self):
+    def save_mapping_settings(self, mapping):
         try:
-            # Получаем актуальный маппинг с видимой страницы
-            mapping = {}
-            if hasattr(self, "page_match") and self.page_match:
-                mapping = self.page_match.get_current_mapping()
-            else:
-                mapping = {}  # ничего не сохранять если не на этой странице
-
             settings_path, _ = QFileDialog.getSaveFileName(
                 self,
                 tr("Сохранить настройки"),
@@ -243,13 +236,7 @@ class FileProcessorApp(QWidget):
             self.log_error(e)
             QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при сохранении настроек: {e}").format(e=e))
 
-    def get_current_mapping(self):
-        if hasattr(self, 'file_to_column') and self.file_to_column:
-            return {file: combobox.currentText() for file, combobox in self.file_to_column.items()}
-        else:
-            return {folder: combobox.currentText() for folder, combobox in self.folder_to_column.items()}
-
-    def load_mapping_settings(self):
+    def load_mapping_settings(self, dialog):
         try:
             settings_path, _ = QFileDialog.getOpenFileName(
                 self,
@@ -260,34 +247,12 @@ class FileProcessorApp(QWidget):
             if settings_path:
                 with open(settings_path, 'r', encoding='utf-8') as f:
                     mapping = json.load(f)
-                # вот тут!
-                self.page_match.apply_mapping(mapping, mapping)
+                dialog.apply_mapping(mapping)
                 self.last_mapping_path = settings_path
                 self.settings.setValue('mapping_path', settings_path)
         except Exception as e:
             self.log_error(e)
             QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при загрузке настроек: {e}").format(e=e))
-
-    def apply_loaded_mapping(self, mapping):
-        # Определяем: файл это или папка
-        file_to_column = {}
-        folder_to_column = {}
-        # Учитываем, что в mapping ключ может быть файлом или папкой
-        for k, v in mapping.items():
-            if os.path.isfile(k) or (self.selected_files and k in self.selected_files):
-                file_to_column[k] = v
-            else:
-                folder_to_column[k] = v
-        # если мы на странице сопоставления - сразу применяем
-        if hasattr(self, "page_match") and self.page_match:
-            self.page_match.apply_mapping(file_to_column, folder_to_column)
-
-    def apply_mapping_to_comboboxes(self, mapping, combobox_dict):
-        for name, column_name in mapping.items():
-            if name in combobox_dict:
-                index = combobox_dict[name].findText(column_name)
-                if index != -1:
-                    combobox_dict[name].setCurrentIndex(index)
 
     def check_sheet_mapping(self):
         """Verify sheet names in selected files and ask user to map if needed."""
