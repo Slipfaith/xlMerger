@@ -71,6 +71,11 @@ class MergeTab(QWidget):
         self.main_file_input.setPlaceholderText(tr("Общий Excel"))
         layout.addWidget(self.main_file_input)
 
+        self.sources_input = DragDropLineEdit(mode='files_or_folder')
+        self.sources_input.setPlaceholderText(tr("Файлы источников"))
+        self.sources_input.filesSelected.connect(self.add_rows_from_files)
+        layout.addWidget(self.sources_input)
+
         self.mappings_layout = QVBoxLayout()
         layout.addLayout(self.mappings_layout)
 
@@ -86,15 +91,22 @@ class MergeTab(QWidget):
         layout.addWidget(merge_btn)
         self.merge_btn = merge_btn
 
-    def add_row(self):
+    def add_row(self, file_path: str | None = None):
         row = MappingRow(self)
         row.remove_btn.clicked.connect(lambda: self.remove_row(row))
         self.mappings_layout.addWidget(row)
         self.rows.append(row)
+        if file_path:
+            row.file_input.setText(file_path)
+        return row
 
     def remove_row(self, row: MappingRow):
         row.setParent(None)
         self.rows.remove(row)
+
+    def add_rows_from_files(self, files: List[str]):
+        for f in files:
+            self.add_row(f)
 
     def run_merge(self):
         main_file = self.main_file_input.text()
@@ -118,6 +130,7 @@ class MergeTab(QWidget):
 
     def retranslate_ui(self):
         self.main_file_input.setPlaceholderText(tr("Общий Excel"))
+        self.sources_input.setPlaceholderText(tr("Файлы источников"))
         self.add_btn.setText(tr("Добавить источник"))
         self.merge_btn.setText(tr("Объединить"))
         for r in self.rows:
