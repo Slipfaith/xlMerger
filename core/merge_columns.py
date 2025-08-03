@@ -3,7 +3,8 @@ from typing import List, Dict
 from openpyxl import load_workbook
 
 
-def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], output_file: str | None = None) -> str:
+def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], output_file: str | None = None,
+                        progress_callback=None) -> str:
     """Merge columns from multiple Excel files into a main workbook.
 
     Args:
@@ -16,6 +17,7 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
               ``source_columns`` and ``target_columns`` must have the same length.
         output_file: Optional path where the merged workbook will be saved. If
             not provided, ``main_file`` suffixed with ``_merged`` is used.
+        progress_callback: Optional callback function(idx, total, mapping) for progress updates.
 
     Returns:
         Path to the saved workbook.
@@ -29,9 +31,10 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
         raise FileNotFoundError(main_file)
 
     wb_main = load_workbook(main_file)
+    total_mappings = len(mappings)
 
     try:
-        for mp in mappings:
+        for idx, mp in enumerate(mappings):
             src = mp.get("source")
             src_cols = mp.get("source_columns", [])
             tgt_sheet = mp.get("target_sheet")
@@ -53,6 +56,9 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
                 for row in range(1, max_row + 1):
                     ws_main[f"{t_col}{row}"].value = ws_src[f"{s_col}{row}"].value
             wb_src.close()
+
+            if progress_callback:
+                progress_callback(idx + 1, total_mappings, mp)
 
         if output_file is None:
             base, ext = os.path.splitext(main_file)

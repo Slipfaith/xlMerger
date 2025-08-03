@@ -2,17 +2,53 @@ from __future__ import annotations
 
 from typing import List
 import os
+import subprocess
+import platform
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QLabel, QGroupBox, QProgressBar
 )
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, QThread, Signal
 
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
 from core.merge_columns import merge_excel_columns
 from .merge_mapping_dialog import MergeMappingDialog
+
+
+class MergeWorker(QThread):
+    finished = Signal(str)
+    error = Signal(str)
+    progress = Signal(int, str)
+
+    def __init__(self, main_file, mappings):
+        super().__init__()
+        self.main_file = main_file
+        self.mappings = mappings
+        self.output_file = None
+
+    def run(self):
+        try:
+            self.progress.emit(1, tr("Подготовка файлов..."))
+
+            def progress_callback(idx, total, mapping):
+                source_file = os.path.basename(mapping.get("source", ""))
+                target_sheet = mapping.get("target_sheet", "")
+                progress_percent = int((idx / total) * 99) + 1
+                message = tr("Обрабатывается файл: {file}, лист: {sheet}").format(
+                    file=source_file,
+                    sheet=target_sheet
+                )
+                self.progress.emit(progress_percent, message)
+
+            self.output_file = merge_excel_columns(self.main_file, self.mappings, progress_callback=progress_callback)
+
+            self.progress.emit(100, tr("Объединение завершено!"))
+            self.finished.emit(self.output_file)
+
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class MergeTab(QWidget):
@@ -32,7 +68,6 @@ class MergeTab(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # Группа для основного файла
         main_group = QGroupBox()
         main_layout = QVBoxLayout()
         self.main_label = QLabel()
@@ -43,7 +78,6 @@ class MergeTab(QWidget):
         main_group.setLayout(main_layout)
         layout.addWidget(main_group)
 
-        # Группа для файлов источников
         sources_group = QGroupBox()
         sources_layout = QVBoxLayout()
         self.sources_label = QLabel()
@@ -55,7 +89,6 @@ class MergeTab(QWidget):
         sources_group.setLayout(sources_layout)
         layout.addWidget(sources_group)
 
-        # Кнопки и прогресс
         button_layout = QVBoxLayout()
         button_layout.addStretch()
 
@@ -66,7 +99,6 @@ class MergeTab(QWidget):
 
         button_layout.addWidget(self.configure_btn)
 
-        # Прогресс бар и статус
         self.progress_widget = QWidget()
         progress_layout = QVBoxLayout(self.progress_widget)
         progress_layout.setContentsMargins(0, 10, 0, 10)
@@ -92,6 +124,16 @@ class MergeTab(QWidget):
             }
         """)
         progress_layout.addWidget(self.progress_bar)
+
+        self.file_link = QLabel()
+        self.file_link.setAlignment(Qt.AlignCenter)
+        self.file_link.setVisible(False)
+        self.file_link.setTextFormat(Qt.RichText)
+        self.file_link.setOpenExternalLinks(False)
+        self.file_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.file_link.linkActivated.connect(self.open_file_location)
+        self.file_link.setStyleSheet("color: #007bff; text-decoration: underline; cursor: pointer;")
+        progress_layout.addWidget(self.file_link)
 
         button_layout.addWidget(self.progress_widget)
 
@@ -157,14 +199,13 @@ class MergeTab(QWidget):
         self.is_processing = True
         self.merge_btn.setEnabled(False)
         self.configure_btn.setEnabled(False)
+        self.file_link.setVisible(False)
 
-        # Показываем прогресс бар
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.status_label.setText(tr("Начинаем объединение..."))
 
-        # Создаем и запускаем worker в отдельном потоке
         self.worker = MergeWorker(self.main_file, self.mappings)
         self.worker.finished.connect(self.on_merge_finished)
         self.worker.error.connect(self.on_merge_error)
@@ -177,27 +218,41 @@ class MergeTab(QWidget):
 
     def on_merge_finished(self, output_file):
         self.worker = None
-        self.progress_bar.setVisible(False)
+        self.output_file = output_file
+        self.progress_bar.setValue(100)
         self.status_label.setText(tr("Объединение завершено успешно!"))
+        self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
+
+        filename = os.path.basename(output_file)
+        self.file_link.setText(f'<a href="file:///{output_file}">{filename}</a>')
+        self.file_link.setVisible(True)
 
         self.is_processing = False
         self.merge_btn.setEnabled(True)
         self.configure_btn.setEnabled(True)
 
-        QMessageBox.information(
-            self, tr("Успех"), tr("Файл сохранён: {output}").format(output=output_file)
-        )
-
     def on_merge_error(self, error_message):
         self.worker = None
         self.progress_bar.setVisible(False)
+        self.file_link.setVisible(False)
         self.status_label.setText(tr("Ошибка при объединении"))
+        self.status_label.setStyleSheet("color: #dc3545; font-weight: bold;")
 
         self.is_processing = False
         self.merge_btn.setEnabled(True)
         self.configure_btn.setEnabled(True)
 
         QMessageBox.critical(self, tr("Ошибка"), error_message)
+
+    def open_file_location(self, link):
+        if hasattr(self, 'output_file'):
+            folder = os.path.dirname(self.output_file)
+            if platform.system() == 'Windows':
+                subprocess.run(['explorer', '/select,', os.path.normpath(self.output_file)])
+            elif platform.system() == 'Darwin':
+                subprocess.run(['open', '-R', self.output_file])
+            else:
+                subprocess.run(['xdg-open', folder])
 
     def retranslate_ui(self):
         self.main_label.setText(tr("Основной Excel файл:"))
