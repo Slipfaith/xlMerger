@@ -12,6 +12,7 @@ from openpyxl import load_workbook
 from core.drag_drop import DragDropLineEdit
 from core.limit_auto import check_limits_auto
 from core.limit_manual import check_limits_manual
+from utils.i18n import tr
 
 def _get_int_value(value):
     try:
@@ -71,16 +72,16 @@ class FileSelectionPage(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         self.file_input = DragDropLineEdit(mode='file')
-        self.file_input.setPlaceholderText("Перетащи Excel-файл сюда или дважды кликни для выбора...")
+        self.file_input.setPlaceholderText(tr("Перетащи Excel-файл сюда или дважды кликни для выбора..."))
         self.file_input.fileSelected.connect(self.file_selected_handler)
-        layout.addWidget(QLabel("Файл Excel:"))
+        layout.addWidget(QLabel(tr("Файл Excel:")))
         layout.addWidget(self.file_input)
-        self.sheet_label = QLabel("Лист: (не выбран)")
+        self.sheet_label = QLabel(tr("Лист: (не выбран)"))
         layout.addWidget(self.sheet_label)
-        self.mapping_btn = QPushButton("Проверить лимиты")
+        self.mapping_btn = QPushButton(tr("Проверить лимиты"))
         self.mapping_btn.clicked.connect(self.mapping_clicked.emit)
         layout.addWidget(self.mapping_btn)
-        self.next_btn = QPushButton("Далее")
+        self.next_btn = QPushButton(tr("Далее"))
         self.next_btn.clicked.connect(self.next_clicked.emit)
         layout.addWidget(self.next_btn)
         self._sheetnames = []
@@ -92,7 +93,7 @@ class FileSelectionPage(QWidget):
     def set_sheets(self, sheets):
         self._sheetnames = sheets
         self._current_sheet = sheets[0] if sheets else ""
-        self.sheet_label.setText(f"Лист: {self._current_sheet}")
+        self.sheet_label.setText(tr("Лист: {sheet}").format(sheet=self._current_sheet))
 
     def current_sheet(self):
         return self._current_sheet
@@ -101,7 +102,7 @@ class FileSelectionPage(QWidget):
 class MappingDialog(QDialog):
     def __init__(self, model: QStandardItemModel, headers: list, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Сопоставление лимитов")
+        self.setWindowTitle(tr("Сопоставление лимитов"))
         self.resize(800, 600)
         self.headers = headers
         self.model = model
@@ -120,8 +121,8 @@ class MappingDialog(QDialog):
 
         # Переключатель режимов
         mode_layout = QHBoxLayout()
-        self.auto_radio = QRadioButton("Автоматический режим")
-        self.manual_radio = QRadioButton("Ручной режим")
+        self.auto_radio = QRadioButton(tr("Автоматический режим"))
+        self.manual_radio = QRadioButton(tr("Ручной режим"))
         self.auto_radio.setChecked(True)
         self.auto_radio.toggled.connect(self.switch_mode)
         mode_layout.addWidget(self.auto_radio)
@@ -130,8 +131,7 @@ class MappingDialog(QDialog):
 
         # Инструкции
         self.info_label = QLabel(
-            "Автоматический: выбери столбец лимитов (синий), затем перетяни мышкой по заголовкам — выделишь текстовые столбцы (зелёный).\n"
-            "Ручной: выдели любые ячейки мышкой, введи лимиты вручную."
+            tr("Автоматический: выбери столбец лимитов (синий), затем перетяни мышкой по заголовкам — выделишь текстовые столбцы (зелёный).\nРучной: выдели любые ячейки мышкой, введи лимиты вручную.")
         )
         self.info_label.setWordWrap(True)
         main_layout.addWidget(self.info_label)
@@ -149,13 +149,13 @@ class MappingDialog(QDialog):
         main_layout.addWidget(self.table)
 
         # Поля лимитов (только для ручного режима)
-        self.manual_group = QGroupBox("Ручной ввод лимитов")
+        self.manual_group = QGroupBox(tr("Ручной ввод лимитов"))
         manual_layout = QHBoxLayout()
         self.upper_limit_edit = QLineEdit()
-        self.upper_limit_edit.setPlaceholderText("Верхний лимит")
+        self.upper_limit_edit.setPlaceholderText(tr("Верхний лимит"))
         self.upper_limit_edit.setFixedWidth(100)
         self.lower_limit_edit = QLineEdit()
-        self.lower_limit_edit.setPlaceholderText("Нижний лимит")
+        self.lower_limit_edit.setPlaceholderText(tr("Нижний лимит"))
         self.lower_limit_edit.setFixedWidth(100)
         manual_layout.addWidget(self.upper_limit_edit)
         manual_layout.addWidget(self.lower_limit_edit)
@@ -164,22 +164,22 @@ class MappingDialog(QDialog):
         main_layout.addWidget(self.manual_group)
 
         # Текущий выбор
-        self.current_label = QLabel("Текущая настройка: —")
+        self.current_label = QLabel(tr("Текущая настройка: —"))
         self.current_label.setWordWrap(True)
         main_layout.addWidget(self.current_label)
 
         # Кнопки
         btn_layout = QHBoxLayout()
-        self.save_btn = QPushButton("Подтвердить")
+        self.save_btn = QPushButton(tr("Подтвердить"))
         self.save_btn.clicked.connect(self.save_mapping)
-        self.clear_btn = QPushButton("Очистить выбор")
+        self.clear_btn = QPushButton(tr("Очистить выбор"))
         self.clear_btn.clicked.connect(self.clear_selection)
         btn_layout.addWidget(self.save_btn)
         btn_layout.addWidget(self.clear_btn)
         main_layout.addLayout(btn_layout)
 
         # Список сопоставлений
-        main_layout.addWidget(QLabel("Сохранённые сопоставления:"))
+        main_layout.addWidget(QLabel(tr("Сохранённые сопоставления:")))
         self.mapping_list = QListWidget()
         self.mapping_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.mapping_list.customContextMenuRequested.connect(self.show_context_menu)
@@ -187,9 +187,9 @@ class MappingDialog(QDialog):
 
         # Готово/Отмена
         bottom_layout = QHBoxLayout()
-        done_btn = QPushButton("Готово")
+        done_btn = QPushButton(tr("Готово"))
         done_btn.clicked.connect(self.accept)
-        cancel_btn = QPushButton("Отмена")
+        cancel_btn = QPushButton(tr("Отмена"))
         cancel_btn.clicked.connect(self.reject)
         bottom_layout.addWidget(done_btn)
         bottom_layout.addWidget(cancel_btn)
@@ -274,20 +274,20 @@ class MappingDialog(QDialog):
     def update_label(self):
         if self.mode_auto:
             if self.current_limit_col is None:
-                txt = "Лимит: —; Тексты: —"
+                txt = tr("Лимит: —; Тексты: —")
             else:
                 lim = self.headers[self.current_limit_col]
                 texts = [self.headers[c] for c in sorted(self.current_text_cols)] if self.current_text_cols else ['—']
-                txt = f"Лимит: {lim}; Тексты: {', '.join(texts)}"
+                txt = tr("Лимит: {lim}; Тексты: {texts}").format(lim=lim, texts=', '.join(texts))
         else:
             if not self.manual_selected:
-                txt = "Ячеек выбрано: —"
+                txt = tr("Ячеек выбрано: —")
             else:
                 cells = [f"({r + 2}, {self.headers[c]})" for r, c in sorted(self.manual_selected)]
                 up = self.upper_limit_edit.text() or '—'
                 low = self.lower_limit_edit.text() or '—'
-                txt = f"Ячейки: {', '.join(cells)}; Верхний: {up}; Нижний: {low}"
-        self.current_label.setText(f"Текущая настройка: {txt}")
+                txt = tr("Ячейки: {cells}; Верхний: {up}; Нижний: {low}").format(cells=', '.join(cells), up=up, low=low)
+        self.current_label.setText(tr("Текущая настройка: {txt}").format(txt=txt))
 
     def clear_selection(self):
         self.table.clearSelection()
@@ -302,7 +302,7 @@ class MappingDialog(QDialog):
     def save_mapping(self):
         if self.mode_auto:
             if self.current_limit_col is None or not self.current_text_cols:
-                QMessageBox.critical(self, "Ошибка", "Выберите лимитный столбец и хотя бы одну колонку с текстом.")
+                QMessageBox.critical(self, tr("Ошибка"), tr("Выберите лимитный столбец и хотя бы одну колонку с текстом."))
                 return
             mapping = (
                 self.headers[self.current_limit_col],
@@ -312,7 +312,7 @@ class MappingDialog(QDialog):
                 None,
                 "column"
             )
-            txt = f"Лимит: {mapping[0]} -> {', '.join(mapping[1])}"
+            txt = tr("Лимит: {lim} -> {texts}").format(lim=mapping[0], texts=', '.join(mapping[1]))
             # --- Оранжевое выделение подтверждённых ячеек (лимит + тексты)
             for row in range(self.model.rowCount()):
                 self.saved_auto_cells.add((row, self.current_limit_col))
@@ -320,7 +320,7 @@ class MappingDialog(QDialog):
                     self.saved_auto_cells.add((row, col))
         else:
             if not self.manual_selected:
-                QMessageBox.critical(self, "Ошибка", "Выделите ячейки для проверки.")
+                QMessageBox.critical(self, tr("Ошибка"), tr("Выделите ячейки для проверки."))
                 return
             upper = _get_int_value(self.upper_limit_edit.text())
             lower = _get_int_value(self.lower_limit_edit.text())
@@ -332,7 +332,11 @@ class MappingDialog(QDialog):
                 "cell"
             )
             cells = ', '.join([f"({r + 2},{self.headers[c]})" for r, c in mapping[0]])
-            txt = f"Ячейки: {cells}; Верхний={upper if upper is not None else '—'}, Нижний={lower if lower is not None else '—'}"
+            txt = tr("Ячейки: {cells}; Верхний={upper}; Нижний={lower}").format(
+                cells=cells,
+                upper=upper if upper is not None else '—',
+                lower=lower if lower is not None else '—'
+            )
             self.saved_manual_cells.update(self.manual_selected)
         self.mappings.append(mapping)
         self.mapping_list.addItem(txt)
@@ -342,7 +346,7 @@ class MappingDialog(QDialog):
         item = self.mapping_list.itemAt(pos)
         if item:
             menu = QMenu()
-            delete_action = menu.addAction("Удалить")
+            delete_action = menu.addAction(tr("Удалить"))
             action = menu.exec(self.mapping_list.mapToGlobal(pos))
             row = self.mapping_list.row(item)
             if action == delete_action:
@@ -358,7 +362,7 @@ class MappingDialog(QDialog):
 class LimitsChecker(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Проверка лимитов")
+        self.setWindowTitle(tr("Проверка лимитов"))
         self.resize(800, 600)
         self.stack = QStackedWidget()
         main_layout = QVBoxLayout()
@@ -384,11 +388,11 @@ class LimitsChecker(QWidget):
             self.file_page.set_sheets(wb.sheetnames)
             self.selected_file = file_path
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить листы: {e}")
+            QMessageBox.critical(self, tr("Ошибка"), tr("Не удалось загрузить листы: {e}").format(e=e))
 
     def open_mapping_dialog(self):
         if not self.selected_file:
-            QMessageBox.critical(self, "Ошибка", "Выберите файл Excel.")
+            QMessageBox.critical(self, tr("Ошибка"), tr("Выберите файл Excel."))
             return
         self.sheet_name = self.file_page.current_sheet()
         try:
@@ -397,10 +401,10 @@ class LimitsChecker(QWidget):
             self.headers = [str(cell.value) if cell.value is not None else ""
                             for cell in next(self.sheet.iter_rows(min_row=1, max_row=1))]
             if not any(self.headers):
-                QMessageBox.critical(self, "Ошибка", "Не найдены заголовки в первой строке.")
+                QMessageBox.critical(self, tr("Ошибка"), tr("Не найдены заголовки в первой строке."))
                 return
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при открытии файла: {e}")
+            QMessageBox.critical(self, tr("Ошибка"), tr("Ошибка при открытии файла: {e}").format(e=e))
             return
         model = QStandardItemModel()
         model.setHorizontalHeaderLabels(self.headers)
@@ -416,13 +420,13 @@ class LimitsChecker(QWidget):
 
     def goto_results_page(self):
         if not self.mappings:
-            QMessageBox.critical(self, "Ошибка", "Сначала создайте сопоставления через кнопку 'Лимиты'.")
+            QMessageBox.critical(self, tr("Ошибка"), tr("Сначала создайте сопоставления через кнопку 'Лимиты'."))
             return
         self.run_limit_check()
 
     def run_limit_check(self):
         if not self.mappings:
-            QMessageBox.critical(self, "Ошибка", "Не заданы сопоставления лимитов.")
+            QMessageBox.critical(self, tr("Ошибка"), tr("Не заданы сопоставления лимитов."))
             return
         report_lines = []
         total_violations = 0
@@ -444,14 +448,14 @@ class LimitsChecker(QWidget):
         try:
             self.workbook.save(output_file)
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {e}")
+            QMessageBox.critical(self, tr("Ошибка"), tr("Не удалось сохранить файл: {e}").format(e=e))
             return
-        report = "Проверка лимитов завершена.\n"
-        report += f"Всего нарушений: {total_violations}\n\n"
+        report = tr("Проверка лимитов завершена.\n")
+        report += tr("Всего нарушений: {n}\n\n").format(n=total_violations)
         if report_lines:
-            report += "Детали:\n" + "\n".join(report_lines)
+            report += tr("Детали:\n") + "\n".join(report_lines)
         else:
-            report += "Нарушений не обнаружено."
+            report += tr("Нарушений не обнаружено.")
         self.report_text = report
         self.results_page = self.create_results_page(output_file)
         self.stack.addWidget(self.results_page)
@@ -460,18 +464,18 @@ class LimitsChecker(QWidget):
     def create_results_page(self, output_file):
         page = QWidget()
         layout = QVBoxLayout()
-        report_label = QLabel("Результаты проверки:")
+        report_label = QLabel(tr("Результаты проверки:"))
         layout.addWidget(report_label)
         self.report_text_edit = QTextEdit()
         self.report_text_edit.setReadOnly(True)
         self.report_text_edit.setText(self.report_text)
         layout.addWidget(self.report_text_edit)
-        file_info = QLabel(f"Изменённый файл сохранён как:\n{output_file}")
+        file_info = QLabel(tr("Изменённый файл сохранён как:\n{output}").format(output=output_file))
         layout.addWidget(file_info)
         btn_layout = QHBoxLayout()
-        back_btn = QPushButton("Вернуться к сопоставлению")
+        back_btn = QPushButton(tr("Вернуться к сопоставлению"))
         back_btn.clicked.connect(self.go_back_to_file_page)
-        close_btn = QPushButton("Закрыть")
+        close_btn = QPushButton(tr("Закрыть"))
         close_btn.clicked.connect(self.close)
         btn_layout.addWidget(back_btn)
         btn_layout.addWidget(close_btn)
