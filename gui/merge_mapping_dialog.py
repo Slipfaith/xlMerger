@@ -58,7 +58,7 @@ class MappingCard(QFrame):
                 background-color: #f8f9fa;
                 border: 1px solid #dee2e6;
                 border-radius: 8px;
-                margin: 5px;
+                margin: 3px;
             }
         """)
 
@@ -66,8 +66,8 @@ class MappingCard(QFrame):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
 
         # Заголовок карточки с кнопкой удаления
         header_layout = QHBoxLayout()
@@ -85,14 +85,14 @@ class MappingCard(QFrame):
         self.remove_btn.setFixedSize(25, 25)
         self.remove_btn.setStyleSheet("""
             QPushButton {
-                background-color: #dc3545;
+                background-color: #e57373;
                 color: white;
                 border: none;
                 border-radius: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #c82333;
+                background-color: #ef5350;
             }
         """)
         header_layout.addWidget(self.remove_btn)
@@ -421,7 +421,8 @@ class MergeMappingDialog(QDialog):
     def __init__(self, main_excel_path, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Настройки объединения")
-        self.setFixedSize(900, 700)
+        self.resize(750, 500)
+        self.setMinimumSize(600, 400)
 
         try:
             self.main_structure = get_excel_structure(main_excel_path)
@@ -454,7 +455,8 @@ class MergeMappingDialog(QDialog):
 
         self.scroll_content = QWidget()
         self.cards_layout = QVBoxLayout(self.scroll_content)
-        self.cards_layout.setSpacing(10)
+        self.cards_layout.setSpacing(8)
+        self.cards_layout.setContentsMargins(5, 5, 5, 5)
         scroll.setWidget(self.scroll_content)
         layout.addWidget(scroll)
 
