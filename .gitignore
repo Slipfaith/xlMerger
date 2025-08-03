@@ -1,20 +1,60 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.log
-*.DS_Store
-*.env
-*.spec
-*.ico
-*.zip
-*.xlsx
-*.xls
-*.json
+
+# IDEs
 .vscode/
 .idea/
-dist/
-build/
+
+# Logs & errors
+*.log
+*.out
 *.bak
 error_log.txt
-*.out
+
+# Env & config
+.env
+*.spec
+*.json
+
+# OS garbage
+*.DS_Store
+Thumbs.db
+
+# Excel & Office
+*.xlsx
+*.xls
+
+# Archives
+*.zip
+
+# Icons
+*.ico
+
+# Executables
 *.exe
+*.dll
+*.pyd
+*.so
+*.asc
+
+# Nuitka
+build/
+dist/
+*.build/
+*.dist/
+*.nuitka*
+*.manifest
+
+# Specific Nuitka output
+main.build/
+main.dist/
+xlmerger.build/
+xlmerger.dist/
+
+# Signed files
+*.exe.asc
+
+# Optional: exclude release artifacts
+releases/
