@@ -65,7 +65,7 @@ class MergeTab(QWidget):
             QMessageBox.critical(self, tr("Ошибка"), tr("Укажи файлы источников."))
             return
 
-        dialog = MergeMappingDialog(self)
+        dialog = MergeMappingDialog(main_file, self)
         for f in self.source_files:
             dialog.add_row(f)
         if dialog.exec():
