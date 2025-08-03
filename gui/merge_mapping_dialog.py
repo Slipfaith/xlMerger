@@ -1,22 +1,25 @@
-# merge_mapping_dialog.py
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QFileDialog,
-    QLabel, QComboBox, QListWidget, QListWidgetItem, QMessageBox, QSizePolicy, QAbstractItemView
+    QLabel, QComboBox, QMessageBox, QScrollArea, QFrame, QGridLayout,
+    QLineEdit, QRadioButton, QButtonGroup, QSpacerItem, QSizePolicy, QTabWidget
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 import os
+from utils.i18n import tr
 
 try:
     import openpyxl
+    from openpyxl.utils import get_column_letter, column_index_from_string
 except ImportError:
     openpyxl = None
+    get_column_letter = None
+    column_index_from_string = None
 try:
     import xlrd
 except ImportError:
     xlrd = None
 
-SUPPORTED_EXT = (".xlsx", ".xls")
-MAX_PREVIEW_ROWS = 5  # для предпросмотра, если нужно
 
 def get_excel_structure(path):
     sheets = {}
@@ -40,183 +43,662 @@ def get_excel_structure(path):
         raise Exception("Unsupported file format or required lib missing")
     return sheets
 
-class MappingRow(QWidget):
+
+class MappingCard(QFrame):
     def __init__(self, main_structure, parent=None):
         super().__init__(parent)
         self.main_structure = main_structure
         self.file_path = None
         self.file_structure = {}
 
-        layout = QHBoxLayout(self)
-        layout.setSpacing(8)
+        self.setFrameStyle(QFrame.Box)
+        self.setLineWidth(1)
+        self.setStyleSheet("""
+            MappingCard {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                margin: 5px;
+            }
+        """)
 
-        self.file_btn = QPushButton("Источник...")
-        self.file_btn.clicked.connect(self.select_file)
-        layout.addWidget(self.file_btn)
+        self._init_ui()
 
-        self.sheet_box = QComboBox()
-        self.sheet_box.setEnabled(False)
-        self.sheet_box.currentIndexChanged.connect(self.on_sheet_change)
-        layout.addWidget(self.sheet_box)
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
 
-        self.cols_list = QListWidget()
-        self.cols_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.cols_list.setEnabled(False)
-        self.cols_list.setMaximumHeight(60)
-        self.cols_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        layout.addWidget(self.cols_list)
+        # Заголовок карточки с кнопкой удаления
+        header_layout = QHBoxLayout()
 
-        self.target_sheet_box = QComboBox()
-        self.target_sheet_box.addItems(main_structure.keys())
-        self.target_sheet_box.setEnabled(True)
-        self.target_sheet_box.currentIndexChanged.connect(self.on_target_sheet_change)
-        layout.addWidget(self.target_sheet_box)
+        self.title_label = QLabel("Новое сопоставление")
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(11)
+        self.title_label.setFont(font)
+        header_layout.addWidget(self.title_label)
 
-        self.target_cols_list = QListWidget()
-        self.target_cols_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.target_cols_list.setEnabled(False)
-        self.target_cols_list.setMaximumHeight(60)
-        self.target_cols_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        layout.addWidget(self.target_cols_list)
+        header_layout.addStretch()
 
         self.remove_btn = QPushButton("✕")
-        layout.addWidget(self.remove_btn)
+        self.remove_btn.setFixedSize(25, 25)
+        self.remove_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        header_layout.addWidget(self.remove_btn)
 
-        self.sheet_box.setMinimumWidth(90)
-        self.cols_list.setMinimumWidth(110)
-        self.target_sheet_box.setMinimumWidth(90)
-        self.target_cols_list.setMinimumWidth(110)
+        layout.addLayout(header_layout)
+
+        # Выбор файла источника
+        file_layout = QHBoxLayout()
+        file_layout.addWidget(QLabel("Файл:"))
+
+        self.file_btn = QPushButton("Выбрать файл...")
+        self.file_btn.clicked.connect(self.select_file)
+        file_layout.addWidget(self.file_btn)
+
+        layout.addLayout(file_layout)
+
+        # Выбор листов
+        sheets_layout = QGridLayout()
+
+        sheets_layout.addWidget(QLabel("Лист источника:"), 0, 0)
+        self.source_sheet_combo = QComboBox()
+        self.source_sheet_combo.setEnabled(False)
+        self.source_sheet_combo.currentTextChanged.connect(self.update_title)
+        sheets_layout.addWidget(self.source_sheet_combo, 0, 1)
+
+        sheets_layout.addWidget(QLabel("Лист назначения:"), 0, 2)
+        self.target_sheet_combo = QComboBox()
+        self.target_sheet_combo.addItems(list(self.main_structure.keys()))
+        self.target_sheet_combo.currentTextChanged.connect(self.update_title)
+        sheets_layout.addWidget(self.target_sheet_combo, 0, 3)
+
+        layout.addLayout(sheets_layout)
+
+        # Режим сопоставления
+        mode_group = QFrame()
+        mode_group.setFrameStyle(QFrame.StyledPanel)
+        mode_layout = QVBoxLayout(mode_group)
+
+        mode_label = QLabel("Режим сопоставления:")
+        mode_label.setStyleSheet("font-weight: bold;")
+        mode_layout.addWidget(mode_label)
+
+        self.mode_group = QButtonGroup()
+
+        self.letter_mode = QRadioButton("По буквенным обозначениям (A, B, C...)")
+        self.letter_mode.setChecked(True)
+        self.letter_mode.toggled.connect(self.on_mode_changed)
+        self.mode_group.addButton(self.letter_mode)
+        mode_layout.addWidget(self.letter_mode)
+
+        self.header_mode = QRadioButton("По заголовкам столбцов")
+        self.header_mode.toggled.connect(self.on_mode_changed)
+        self.mode_group.addButton(self.header_mode)
+        mode_layout.addWidget(self.header_mode)
+
+        layout.addWidget(mode_group)
+
+        # Область сопоставления
+        self.mapping_widget = QWidget()
+        self.mapping_layout = QVBoxLayout(self.mapping_widget)
+        layout.addWidget(self.mapping_widget)
+
+        self.create_mapping_interface()
 
     def select_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Выбери Excel", "", "Excel files (*.xlsx *.xls)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Выбери Excel", "", "Excel файлы (*.xlsx *.xls)"
+        )
         if not file_path:
             return
+
         try:
             structure = get_excel_structure(file_path)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка чтения файла:\n{e}")
             return
+
         self.file_path = file_path
         self.file_structure = structure
-        self.file_btn.setText(os.path.basename(file_path))
-        self.sheet_box.clear()
-        self.sheet_box.addItems(list(structure.keys()))
-        self.sheet_box.setEnabled(True)
-        self.on_sheet_change()
 
-    def on_sheet_change(self):
-        sheet = self.sheet_box.currentText()
-        headers = self.file_structure.get(sheet, [])
-        self.cols_list.clear()
-        for h in headers:
-            item = QListWidgetItem(h)
-            item.setCheckState(Qt.Unchecked)
-            self.cols_list.addItem(item)
-        self.cols_list.setEnabled(bool(headers))
+        filename = os.path.basename(file_path)
+        if len(filename) > 25:
+            filename = filename[:22] + "..."
+        self.file_btn.setText(filename)
 
-    def on_target_sheet_change(self):
-        sheet = self.target_sheet_box.currentText()
-        headers = self.main_structure.get(sheet, [])
-        self.target_cols_list.clear()
-        for h in headers:
-            item = QListWidgetItem(h)
-            item.setCheckState(Qt.Unchecked)
-            self.target_cols_list.addItem(item)
-        self.target_cols_list.setEnabled(bool(headers))
+        self.source_sheet_combo.clear()
+        self.source_sheet_combo.addItems(list(structure.keys()))
+        self.source_sheet_combo.setEnabled(True)
+
+        self.update_title()
+        self.create_mapping_interface()
+
+    def update_title(self):
+        if self.file_path:
+            filename = os.path.basename(self.file_path)
+            if len(filename) > 20:
+                filename = filename[:17] + "..."
+
+            source_sheet = self.source_sheet_combo.currentText()
+            target_sheet = self.target_sheet_combo.currentText()
+
+            title = f"{filename}"
+            if source_sheet and target_sheet:
+                title += f" [{source_sheet} → {target_sheet}]"
+
+            self.title_label.setText(title)
+
+    def on_mode_changed(self):
+        self.create_mapping_interface()
+
+    def create_mapping_interface(self):
+        # Очищаем старый интерфейс
+        for i in reversed(range(self.mapping_layout.count())):
+            self.mapping_layout.itemAt(i).widget().setParent(None)
+
+        if not self.file_path:
+            info_label = QLabel("Сначала выберите файл")
+            info_label.setStyleSheet("color: #6c757d; font-style: italic;")
+            self.mapping_layout.addWidget(info_label)
+            return
+
+        source_sheet = self.source_sheet_combo.currentText()
+        target_sheet = self.target_sheet_combo.currentText()
+
+        if not source_sheet or not target_sheet:
+            return
+
+        source_headers = self.file_structure.get(source_sheet, [])
+        target_headers = self.main_structure.get(target_sheet, [])
+
+        if self.letter_mode.isChecked():
+            self.create_letter_mapping(source_headers, target_headers)
+        else:
+            self.create_header_mapping(source_headers, target_headers)
+
+    def create_letter_mapping(self, source_headers, target_headers):
+        mapping_frame = QFrame()
+        mapping_frame.setFrameStyle(QFrame.StyledPanel)
+        mapping_layout = QVBoxLayout(mapping_frame)
+
+        mapping_layout.addWidget(QLabel("Сопоставление столбцов (источник → назначение):"))
+
+        # Создаем поля для ввода
+        self.letter_mappings = []
+
+        grid = QGridLayout()
+        grid.addWidget(QLabel("Источник"), 0, 0)
+        grid.addWidget(QLabel("→"), 0, 1)
+        grid.addWidget(QLabel("Назначение"), 0, 2)
+        grid.addWidget(QLabel(""), 0, 3)  # Для кнопки удаления
+
+        # Добавляем первую строку
+        self.add_letter_mapping_row(grid, 1)
+
+        mapping_layout.addLayout(grid)
+
+        # Кнопка добавления
+        add_btn = QPushButton("+ Добавить сопоставление")
+        add_btn.clicked.connect(lambda: self.add_letter_mapping_row(grid, len(self.letter_mappings) + 1))
+        mapping_layout.addWidget(add_btn)
+
+        self.mapping_layout.addWidget(mapping_frame)
+
+    def add_letter_mapping_row(self, grid, row):
+        source_edit = QLineEdit()
+        source_edit.setPlaceholderText("A")
+        source_edit.setMaximumWidth(50)
+
+        target_edit = QLineEdit()
+        target_edit.setPlaceholderText("A")
+        target_edit.setMaximumWidth(50)
+
+        remove_btn = QPushButton("✕")
+        remove_btn.setFixedSize(20, 20)
+        remove_btn.setStyleSheet("background-color: #dc3545; color: white; border: none; border-radius: 10px;")
+        remove_btn.clicked.connect(lambda: self.remove_letter_mapping_row(source_edit, target_edit, remove_btn))
+
+        grid.addWidget(source_edit, row, 0)
+        grid.addWidget(QLabel("→"), row, 1)
+        grid.addWidget(target_edit, row, 2)
+        grid.addWidget(remove_btn, row, 3)
+
+        self.letter_mappings.append((source_edit, target_edit, remove_btn))
+
+    def remove_letter_mapping_row(self, source_edit, target_edit, remove_btn):
+        if len(self.letter_mappings) > 1:
+            source_edit.setParent(None)
+            target_edit.setParent(None)
+            remove_btn.setParent(None)
+            self.letter_mappings = [(s, t, r) for s, t, r in self.letter_mappings if s != source_edit]
+
+    def create_header_mapping(self, source_headers, target_headers):
+        mapping_frame = QFrame()
+        mapping_frame.setFrameStyle(QFrame.StyledPanel)
+        mapping_layout = QVBoxLayout(mapping_frame)
+
+        mapping_layout.addWidget(QLabel("Сопоставление по заголовкам:"))
+
+        # Создаем комбобоксы для сопоставления
+        self.header_mappings = []
+
+        grid = QGridLayout()
+        grid.addWidget(QLabel("Источник"), 0, 0)
+        grid.addWidget(QLabel("→"), 0, 1)
+        grid.addWidget(QLabel("Назначение"), 0, 2)
+        grid.addWidget(QLabel(""), 0, 3)  # Для кнопки удаления
+
+        # Добавляем первую строку
+        self.add_header_mapping_row(grid, 1, source_headers, target_headers)
+
+        mapping_layout.addLayout(grid)
+
+        # Кнопка добавления
+        add_btn = QPushButton("+ Добавить сопоставление")
+        add_btn.clicked.connect(
+            lambda: self.add_header_mapping_row(grid, len(self.header_mappings) + 1, source_headers, target_headers))
+        mapping_layout.addWidget(add_btn)
+
+        # Кнопка автосопоставления
+        auto_btn = QPushButton("Автосопоставить")
+        auto_btn.clicked.connect(lambda: self.auto_map_headers(source_headers, target_headers))
+        mapping_layout.addWidget(auto_btn)
+
+        self.mapping_layout.addWidget(mapping_frame)
+
+    def add_header_mapping_row(self, grid, row, source_headers, target_headers):
+        source_combo = QComboBox()
+        source_combo.addItem("")  # Пустой элемент
+        source_combo.addItems([f"{get_column_letter(i + 1) if get_column_letter else chr(65 + i)}: {h}"
+                               for i, h in enumerate(source_headers)])
+
+        target_combo = QComboBox()
+        target_combo.addItem("")  # Пустой элемент
+        target_combo.addItems([f"{get_column_letter(i + 1) if get_column_letter else chr(65 + i)}: {h}"
+                               for i, h in enumerate(target_headers)])
+
+        remove_btn = QPushButton("✕")
+        remove_btn.setFixedSize(20, 20)
+        remove_btn.setStyleSheet("background-color: #dc3545; color: white; border: none; border-radius: 10px;")
+        remove_btn.clicked.connect(lambda: self.remove_header_mapping_row(source_combo, target_combo, remove_btn))
+
+        grid.addWidget(source_combo, row, 0)
+        grid.addWidget(QLabel("→"), row, 1)
+        grid.addWidget(target_combo, row, 2)
+        grid.addWidget(remove_btn, row, 3)
+
+        self.header_mappings.append((source_combo, target_combo, remove_btn))
+
+    def remove_header_mapping_row(self, source_combo, target_combo, remove_btn):
+        if len(self.header_mappings) > 1:
+            source_combo.setParent(None)
+            target_combo.setParent(None)
+            remove_btn.setParent(None)
+            self.header_mappings = [(s, t, r) for s, t, r in self.header_mappings if s != source_combo]
+
+    def auto_map_headers(self, source_headers, target_headers):
+        # Очищаем текущие сопоставления
+        for source_combo, target_combo, _ in self.header_mappings:
+            source_combo.setCurrentIndex(0)
+            target_combo.setCurrentIndex(0)
+
+        # Находим совпадающие заголовки
+        mapped_pairs = []
+        for i, src_header in enumerate(source_headers):
+            if src_header.strip():
+                for j, tgt_header in enumerate(target_headers):
+                    if src_header == tgt_header:
+                        mapped_pairs.append((i, j))
+                        break
+
+        # Применяем сопоставления
+        for idx, (src_idx, tgt_idx) in enumerate(mapped_pairs):
+            if idx < len(self.header_mappings):
+                self.header_mappings[idx][0].setCurrentIndex(src_idx + 1)  # +1 из-за пустого элемента
+                self.header_mappings[idx][1].setCurrentIndex(tgt_idx + 1)
 
     def get_mapping(self):
-        # Валидация обязательных полей
-        if not self.file_path or not self.sheet_box.currentText():
+        if not self.file_path:
             return None
-        src_cols = [self.cols_list.item(i).text()
-                    for i in range(self.cols_list.count())
-                    if self.cols_list.item(i).checkState() == Qt.Checked]
-        tgt_cols = [self.target_cols_list.item(i).text()
-                    for i in range(self.target_cols_list.count())
-                    if self.target_cols_list.item(i).checkState() == Qt.Checked]
+
+        source_sheet = self.source_sheet_combo.currentText()
+        target_sheet = self.target_sheet_combo.currentText()
+
+        if not source_sheet or not target_sheet:
+            return None
+
+        source_columns = []
+        target_columns = []
+
+        if self.letter_mode.isChecked():
+            # Обработка буквенных обозначений
+            for source_edit, target_edit, _ in self.letter_mappings:
+                src_text = source_edit.text().strip().upper()
+                tgt_text = target_edit.text().strip().upper()
+
+                if src_text and tgt_text:
+                    # Просто используем буквенные обозначения как есть
+                    source_columns.append(src_text)
+                    target_columns.append(tgt_text)
+        else:
+            # Обработка заголовков
+            for source_combo, target_combo, _ in self.header_mappings:
+                src_idx = source_combo.currentIndex()
+                tgt_idx = target_combo.currentIndex()
+
+                if src_idx > 0 and tgt_idx > 0:  # Не пустые значения
+                    source_headers = self.file_structure.get(source_sheet, [])
+                    target_headers = self.main_structure.get(target_sheet, [])
+
+                    if src_idx - 1 < len(source_headers) and tgt_idx - 1 < len(target_headers):
+                        source_columns.append(source_headers[src_idx - 1])
+                        target_columns.append(target_headers[tgt_idx - 1])
+
+        if not source_columns or not target_columns:
+            return None
+
         return {
-            "source_file": self.file_path,
-            "source_sheet": self.sheet_box.currentText(),
-            "source_columns": src_cols,
-            "target_sheet": self.target_sheet_box.currentText(),
-            "target_columns": tgt_cols
+            "source": self.file_path,
+            "source_columns": source_columns,
+            "target_sheet": target_sheet,
+            "target_columns": target_columns
         }
 
-    def auto_map_columns(self):
-        # Сопоставить колонки с совпадающими именами
-        src_headers = self.file_structure.get(self.sheet_box.currentText(), [])
-        tgt_headers = self.main_structure.get(self.target_sheet_box.currentText(), [])
-        min_len = min(len(src_headers), len(tgt_headers))
-        # Сопоставлять по одинаковым именам
-        for i in range(self.cols_list.count()):
-            item = self.cols_list.item(i)
-            if item.text() in tgt_headers:
-                item.setCheckState(Qt.Checked)
-        for i in range(self.target_cols_list.count()):
-            item = self.target_cols_list.item(i)
-            if item.text() in src_headers:
-                item.setCheckState(Qt.Checked)
 
 class MergeMappingDialog(QDialog):
     def __init__(self, main_excel_path, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Настройки объединения")
-        self.setMinimumWidth(1000)
-        layout = QVBoxLayout(self)
+        self.setFixedSize(900, 700)
 
-        # Главный Excel: строим структуру один раз
         try:
             self.main_structure = get_excel_structure(main_excel_path)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка чтения главного файла:\n{e}")
             self.main_structure = {}
 
-        self.rows = []
-        self.rows_layout = QVBoxLayout()
-        layout.addLayout(self.rows_layout)
+        self.cards = []
+        self._init_ui()
 
-        btns_row = QHBoxLayout()
-        self.add_btn = QPushButton("Добавить источник")
-        self.add_btn.clicked.connect(self.add_row)
-        btns_row.addWidget(self.add_btn)
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
 
-        self.auto_map_btn = QPushButton("Автосопоставить")
-        self.auto_map_btn.clicked.connect(self.auto_map_all)
-        btns_row.addWidget(self.auto_map_btn)
+        # Заголовок
+        title = QLabel("Настройка объединения Excel файлов")
+        title.setAlignment(Qt.AlignCenter)
+        font = QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        title.setFont(font)
+        layout.addWidget(title)
 
-        btns_row.addStretch()
-        layout.addLayout(btns_row)
+        # Скролл область для карточек
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        ok_row = QHBoxLayout()
-        ok_row.addStretch()
+        self.scroll_content = QWidget()
+        self.cards_layout = QVBoxLayout(self.scroll_content)
+        self.cards_layout.setSpacing(10)
+        scroll.setWidget(self.scroll_content)
+        layout.addWidget(scroll)
+
+        # Кнопки управления
+        controls_layout = QHBoxLayout()
+
+        self.add_btn = QPushButton("+ Добавить сопоставление")
+        self.add_btn.clicked.connect(self.add_card)
+        controls_layout.addWidget(self.add_btn)
+
+        self.apply_first_btn = QPushButton("Применить настройки первого ко всем")
+        self.apply_first_btn.clicked.connect(self.apply_first_to_all)
+        self.apply_first_btn.setStyleSheet("background-color: #d2f7c6; color: black;")
+        controls_layout.addWidget(self.apply_first_btn)
+
+        controls_layout.addStretch()
+        layout.addLayout(controls_layout)
+
+        # Кнопки диалога
+        dialog_btns = QHBoxLayout()
+        dialog_btns.addStretch()
+
         self.ok_btn = QPushButton("Готово")
         self.ok_btn.clicked.connect(self.accept)
-        ok_row.addWidget(self.ok_btn)
+        self.ok_btn.setMinimumWidth(100)
+
         self.cancel_btn = QPushButton("Отмена")
         self.cancel_btn.clicked.connect(self.reject)
-        ok_row.addWidget(self.cancel_btn)
-        layout.addLayout(ok_row)
+        self.cancel_btn.setMinimumWidth(100)
 
-    def add_row(self):
-        row = MappingRow(self.main_structure, self)
-        row.remove_btn.clicked.connect(lambda: self.remove_row(row))
-        self.rows.append(row)
-        self.rows_layout.addWidget(row)
+        dialog_btns.addWidget(self.ok_btn)
+        dialog_btns.addWidget(self.cancel_btn)
+        layout.addLayout(dialog_btns)
 
-    def remove_row(self, row):
-        self.rows.remove(row)
-        row.setParent(None)
-        row.deleteLater()
+    def add_card(self):
+        card = MappingCard(self.main_structure, self)
+        card.remove_btn.clicked.connect(lambda: self.remove_card(card))
+        self.cards.append(card)
+        self.cards_layout.addWidget(card)
 
-    def auto_map_all(self):
-        for row in self.rows:
-            row.auto_map_columns()
+    def add_row_with_file(self, file_path):
+        card = MappingCard(self.main_structure, self)
+        card.remove_btn.clicked.connect(lambda: self.remove_card(card))
+
+        try:
+            structure = get_excel_structure(file_path)
+            card.file_path = file_path
+            card.file_structure = structure
+
+            filename = os.path.basename(file_path)
+            if len(filename) > 25:
+                filename = filename[:22] + "..."
+            card.file_btn.setText(filename)
+
+            card.source_sheet_combo.clear()
+            card.source_sheet_combo.addItems(list(structure.keys()))
+            card.source_sheet_combo.setEnabled(True)
+
+            card.update_title()
+            card.create_mapping_interface()
+        except Exception as e:
+            QMessageBox.warning(self, "Предупреждение", f"Не удалось загрузить {file_path}: {e}")
+
+        self.cards.append(card)
+        self.cards_layout.addWidget(card)
+
+    def remove_card(self, card):
+        self.cards.remove(card)
+        card.setParent(None)
+        card.deleteLater()
+
+    def apply_first_to_all(self):
+        if not self.cards:
+            QMessageBox.warning(self, "Предупреждение", "Нет карточек для применения настроек.")
+            return
+
+        first_card = self.cards[0]
+
+        if not first_card.file_path:
+            QMessageBox.warning(self, "Предупреждение", "В первой карточке не выбран файл.")
+            return
+
+        # Получаем настройки из первой карточки
+        first_settings = self.get_first_card_settings(first_card)
+        if not first_settings:
+            QMessageBox.warning(self, "Предупреждение", "В первой карточке нет настроенных сопоставлений.")
+            return
+
+        # Применяем к остальным карточкам
+        applied_count = 0
+        for card in self.cards[1:]:
+            if card.file_path:
+                self.apply_settings_to_card(card, first_settings)
+                applied_count += 1
+
+        if applied_count > 0:
+            QMessageBox.information(self, "Успех", f"Настройки применены к {applied_count} карточкам.")
+        else:
+            QMessageBox.warning(self, "Предупреждение", "Нет карточек с выбранными файлами для применения.")
+
+    def get_first_card_settings(self, card):
+        settings = {
+            'mode': 'letter' if card.letter_mode.isChecked() else 'header',
+            'target_sheet': card.target_sheet_combo.currentText(),
+            'mappings': []
+        }
+
+        if card.letter_mode.isChecked():
+            for source_edit, target_edit, _ in card.letter_mappings:
+                src_text = source_edit.text().strip()
+                tgt_text = target_edit.text().strip()
+                if src_text and tgt_text:
+                    settings['mappings'].append((src_text, tgt_text))
+        else:
+            for source_combo, target_combo, _ in card.header_mappings:
+                src_idx = source_combo.currentIndex()
+                tgt_idx = target_combo.currentIndex()
+                if src_idx > 0 and tgt_idx > 0:
+                    src_text = source_combo.currentText()
+                    tgt_text = target_combo.currentText()
+                    settings['mappings'].append((src_text, tgt_text))
+
+        return settings if settings['mappings'] else None
+
+    def apply_settings_to_card(self, card, settings):
+        # Устанавливаем режим
+        if settings['mode'] == 'letter':
+            card.letter_mode.setChecked(True)
+        else:
+            card.header_mode.setChecked(True)
+
+        # Устанавливаем целевой лист
+        target_idx = card.target_sheet_combo.findText(settings['target_sheet'])
+        if target_idx >= 0:
+            card.target_sheet_combo.setCurrentIndex(target_idx)
+
+        # Пересоздаем интерфейс сопоставления
+        card.create_mapping_interface()
+
+        # Применяем сопоставления
+        if settings['mode'] == 'letter':
+            # Очищаем текущие сопоставления
+            for source_edit, target_edit, remove_btn in card.letter_mappings[1:]:
+                source_edit.setParent(None)
+                target_edit.setParent(None)
+                remove_btn.setParent(None)
+            card.letter_mappings = card.letter_mappings[:1]
+
+            # Применяем новые
+            for i, (src_text, tgt_text) in enumerate(settings['mappings']):
+                if i == 0 and card.letter_mappings:
+                    # Используем первую существующую строку
+                    card.letter_mappings[0][0].setText(src_text)
+                    card.letter_mappings[0][1].setText(tgt_text)
+                else:
+                    # Добавляем новые строки
+                    grid = card.mapping_widget.layout().itemAt(0).widget().layout().itemAt(1).layout()
+                    card.add_letter_mapping_row(grid, len(card.letter_mappings) + 1)
+                    card.letter_mappings[-1][0].setText(src_text)
+                    card.letter_mappings[-1][1].setText(tgt_text)
+        else:
+            # Для режима заголовков
+            source_headers = card.file_structure.get(card.source_sheet_combo.currentText(), [])
+            target_headers = card.main_structure.get(card.target_sheet_combo.currentText(), [])
+
+            # Очищаем текущие сопоставления
+            for source_combo, target_combo, remove_btn in card.header_mappings[1:]:
+                source_combo.setParent(None)
+                target_combo.setParent(None)
+                remove_btn.setParent(None)
+
+    def apply_settings_to_card(self, card, settings):
+        # Устанавливаем режим
+        if settings['mode'] == 'letter':
+            card.letter_mode.setChecked(True)
+        else:
+            card.header_mode.setChecked(True)
+
+        # Устанавливаем целевой лист
+        target_idx = card.target_sheet_combo.findText(settings['target_sheet'])
+        if target_idx >= 0:
+            card.target_sheet_combo.setCurrentIndex(target_idx)
+
+        # Пересоздаем интерфейс сопоставления
+        card.create_mapping_interface()
+
+        # Применяем сопоставления
+        if settings['mode'] == 'letter':
+            # Очищаем текущие сопоставления
+            for source_edit, target_edit, remove_btn in card.letter_mappings[1:]:
+                source_edit.setParent(None)
+                target_edit.setParent(None)
+                remove_btn.setParent(None)
+            card.letter_mappings = card.letter_mappings[:1]
+
+            # Применяем новые
+            for i, (src_text, tgt_text) in enumerate(settings['mappings']):
+                if i == 0 and card.letter_mappings:
+                    # Используем первую существующую строку
+                    card.letter_mappings[0][0].setText(src_text)
+                    card.letter_mappings[0][1].setText(tgt_text)
+                else:
+                    # Добавляем новые строки
+                    grid = card.mapping_widget.layout().itemAt(0).widget().layout().itemAt(1).layout()
+                    card.add_letter_mapping_row(grid, len(card.letter_mappings) + 1)
+                    card.letter_mappings[-1][0].setText(src_text)
+                    card.letter_mappings[-1][1].setText(tgt_text)
+        else:
+            # Для режима заголовков
+            source_headers = card.file_structure.get(card.source_sheet_combo.currentText(), [])
+            target_headers = card.main_structure.get(card.target_sheet_combo.currentText(), [])
+
+            # Очищаем текущие сопоставления
+            for source_combo, target_combo, remove_btn in card.header_mappings[1:]:
+                source_combo.setParent(None)
+                target_combo.setParent(None)
+                remove_btn.setParent(None)
+            card.header_mappings = card.header_mappings[:1]
+
+            # Применяем новые
+            for i, (src_text, tgt_text) in enumerate(settings['mappings']):
+                if i == 0 and card.header_mappings:
+                    # Используем первую существующую строку
+                    src_idx = card.header_mappings[0][0].findText(src_text)
+                    tgt_idx = card.header_mappings[0][1].findText(tgt_text)
+                    if src_idx >= 0:
+                        card.header_mappings[0][0].setCurrentIndex(src_idx)
+                    if tgt_idx >= 0:
+                        card.header_mappings[0][1].setCurrentIndex(tgt_idx)
+                else:
+                    # Добавляем новые строки
+                    grid = card.mapping_widget.layout().itemAt(0).widget().layout().itemAt(2).layout()
+                    card.add_header_mapping_row(grid, len(card.header_mappings) + 1, source_headers, target_headers)
+                    src_idx = card.header_mappings[-1][0].findText(src_text)
+                    tgt_idx = card.header_mappings[-1][1].findText(tgt_text)
+                    if src_idx >= 0:
+                        card.header_mappings[-1][0].setCurrentIndex(src_idx)
+                    if tgt_idx >= 0:
+                        card.header_mappings[-1][1].setCurrentIndex(tgt_idx)
 
     def get_mappings(self):
         result = []
-        for row in self.rows:
-            mapping = row.get_mapping()
+        for card in self.cards:
+            mapping = card.get_mapping()
             if mapping:
                 result.append(mapping)
         return result
-
