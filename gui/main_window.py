@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
 from PySide6.QtGui import QAction
 from utils.i18n import tr, i18n
 from utils.updater import check_for_update
-from .. import __version__
+from __init__ import __version__
 
 from .file_processor_app import FileProcessorApp
 from .limits_checker import LimitsChecker
