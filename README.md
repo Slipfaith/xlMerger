@@ -1,8 +1,17 @@
 # xlMerger
 
+![xlMerger icon](xlM2.0.png)
+
 ## English
 
-xlMerger is a Qt based utility for merging translation spreadsheets, checking string length limits and splitting Excel files.
+xlMerger is a desktop utility built with PySide6 for working with translation spreadsheets. The tool can merge data from multiple Excel files, check string length limits and split workbooks into smaller parts.
+
+### Features
+
+- Merge columns from several Excel spreadsheets into a single target file.
+- Validate string lengths automatically or manually against predefined limits.
+- Split large Excel files into multiple smaller files.
+- Drag-and-drop support for quick file selection.
 
 ### Installation
 
@@ -18,7 +27,7 @@ Run the application:
 python main.py
 ```
 
-To run tests:
+### Running tests
 
 ```bash
 pytest
@@ -26,7 +35,14 @@ pytest
 
 ## Русский
 
-xlMerger – это утилита на Qt для объединения переводческих таблиц, проверки длины строк и разделения Excel-файлов.
+xlMerger — это настольная утилита на базе PySide6 для работы с переводческими таблицами. Программа объединяет данные из нескольких Excel-файлов, проверяет ограничения по длине строк и разбивает книги на части.
+
+### Возможности
+
+- Объединение столбцов из нескольких Excel-файлов в один целевой документ.
+- Проверка длины строк автоматически или вручную по заданным ограничениям.
+- Разделение больших Excel-книг на несколько файлов.
+- Поддержка перетаскивания файлов (drag-and-drop).
 
 ### Установка
 
@@ -42,8 +58,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Запуск тестов:
+### Запуск тестов
 
 ```bash
 pytest
 ```
+
