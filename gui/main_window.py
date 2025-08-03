@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
 from PySide6.QtGui import QAction
 from utils.i18n import tr, i18n
 from utils.updater import check_for_update
+from .. import __version__
 
 from .file_processor_app import FileProcessorApp
 from .limits_checker import LimitsChecker
@@ -92,7 +93,10 @@ class MainWindow(QMainWindow):
         self.retranslate_ui()
 
     def show_about(self):
-        QMessageBox.information(self, tr("About"), tr("Объединяй и проверяй\nVersion 2.1 3.08.2025\nslipfaith"))
+        info_text = (
+            f"{tr('Объединяй и проверяй')}\n{tr('Version')} {__version__}\nslipfaith"
+        )
+        QMessageBox.information(self, tr("About"), info_text)
 
     def check_updates(self, auto: bool = False):
         """Check for application updates via GitHub Releases."""
