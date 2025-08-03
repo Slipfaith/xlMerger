@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal
 from core.drag_drop import DragDropLineEdit
+from utils.i18n import tr
 
 class FileSelectionPage(QWidget):
     file_selected = Signal(str)
@@ -18,7 +19,7 @@ class FileSelectionPage(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        file_group = QGroupBox("Выбор файла (перетащи Excel или дважды кликни)")
+        file_group = QGroupBox(tr("Выбор файла (перетащи Excel или дважды кликни)"))
         file_layout = QHBoxLayout()
         self.file_line = DragDropLineEdit(mode='file')
         self.file_line.fileSelected.connect(self.on_file_dropped)
@@ -26,7 +27,7 @@ class FileSelectionPage(QWidget):
         file_group.setLayout(file_layout)
         layout.addWidget(file_group)
 
-        sheet_group = QGroupBox("Выбор листа")
+        sheet_group = QGroupBox(tr("Выбор листа"))
         sheet_layout = QHBoxLayout()
         self.sheet_combo = QComboBox()
         self.sheet_combo.currentTextChanged.connect(self.on_sheet_changed)
@@ -35,9 +36,9 @@ class FileSelectionPage(QWidget):
         layout.addWidget(sheet_group)
 
         btn_layout = QHBoxLayout()
-        self.map_button = QPushButton("Лимиты")
+        self.map_button = QPushButton(tr("Лимиты"))
         self.map_button.clicked.connect(self.mapping_clicked.emit)
-        self.next_button = QPushButton("Далее")
+        self.next_button = QPushButton(tr("Далее"))
         self.next_button.clicked.connect(self.next_clicked.emit)
         btn_layout.addWidget(self.map_button)
         btn_layout.addWidget(self.next_button)
