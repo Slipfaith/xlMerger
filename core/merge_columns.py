@@ -48,13 +48,13 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
                 raise KeyError(tgt_sheet)
 
             ws_main = wb_main[tgt_sheet]
-            wb_src = load_workbook(src, read_only=True)
+            wb_src = load_workbook(src, data_only=True)
             ws_src = wb_src.active
 
             for s_col, t_col in zip(src_cols, tgt_cols):
-                max_row = max(ws_src.max_row, ws_main.max_row)
-                for row in range(1, max_row + 1):
-                    ws_main[f"{t_col}{row}"].value = ws_src[f"{s_col}{row}"].value
+                for cell in ws_src[s_col]:
+                    if cell.value is not None:
+                        ws_main[f"{t_col}{cell.row}"] = cell.value
             wb_src.close()
 
             if progress_callback:
