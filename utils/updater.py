@@ -3,6 +3,10 @@ import sys
 import subprocess
 import tempfile
 import requests
+try:
+    from pgpy import PGPKey, PGPSignature  # type: ignore
+except Exception:  # pragma: no cover - fallback when pgpy isn't available
+    PGPKey = PGPSignature = None
 from PySide6.QtWidgets import QMessageBox, QProgressDialog, QApplication
 from PySide6.QtCore import Qt
 from utils.i18n import tr
@@ -88,6 +92,20 @@ def download_asset(url: str, name: str) -> str:
 
 
 def _verify_signature(exe_path: str, sig_path: str):
+    """Verify a detached GPG signature for the downloaded update.
+
+    Tries to use the ``pgpy`` library first. If it's unavailable, falls back
+    to the ``gpg`` command line utility.
+    """
+    if PGPKey is not None and PGPSignature is not None:
+        key, _ = PGPKey.from_blob(PUBLIC_GPG_KEY)
+        signature = PGPSignature.from_file(sig_path)
+        with open(exe_path, "rb") as f:
+            data = f.read()
+        if not key.verify(data, signature):
+            raise ValueError("Invalid update signature")
+        return
+
     key_file = tempfile.NamedTemporaryFile(delete=False, suffix=".asc")
     try:
         key_file.write(PUBLIC_GPG_KEY.encode("utf-8"))
