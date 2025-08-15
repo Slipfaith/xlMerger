@@ -122,7 +122,7 @@ class MainPageWidget(QWidget):
             self.skip_first_row_checkbox.setEnabled(True)
 
     def create_preview_button(self):
-        self.preview_button = QPushButton(tr("Превью"), self)
+        self.preview_button = QPushButton(tr("Настроить"), self)
         self.preview_button.clicked.connect(self.previewTriggered)
         return self.preview_button
 
@@ -152,5 +152,5 @@ class MainPageWidget(QWidget):
         self.deselect_all_button.setText(tr("Не выбрать все"))
         self.select_all_button.setText(tr("Выбрать все"))
         self.sheet_label.setText(tr("Выберите листы:"))
-        self.preview_button.setText(tr("Превью"))
+        self.preview_button.setText(tr("Настроить"))
         self.process_button.setText(tr("Начать"))
