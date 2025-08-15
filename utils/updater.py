@@ -3,14 +3,27 @@ import sys
 import subprocess
 import tempfile
 import requests
+
+PREVIOUS_VERSION = "2.1"
+CURRENT_VERSION = "2.2"
+__version__ = CURRENT_VERSION
+
 try:
     from pgpy import PGPKey, PGPSignature  # type: ignore
 except Exception:  # pragma: no cover - fallback when pgpy isn't available
     PGPKey = PGPSignature = None
-from PySide6.QtWidgets import QMessageBox, QProgressDialog, QApplication
-from PySide6.QtCore import Qt
-from utils.i18n import tr
-from __init__ import __version__
+
+try:  # pragma: no cover - optional GUI dependencies
+    from PySide6.QtWidgets import QMessageBox, QProgressDialog, QApplication
+    from PySide6.QtCore import Qt
+except Exception:  # when PySide6 or system libraries are missing
+    QMessageBox = QProgressDialog = QApplication = None  # type: ignore
+    Qt = None  # type: ignore
+
+try:
+    from .i18n import tr  # type: ignore
+except ImportError:  # pragma: no cover - fallback for script execution
+    from utils.i18n import tr
 
 pending_update = None
 
@@ -159,6 +172,8 @@ def _schedule_update_on_exit(new_exe: str):
         app.aboutToQuit.connect(_on_quit)
 
 def check_for_update(parent, auto=False):
+    if any(obj is None for obj in (QProgressDialog, QMessageBox, QApplication, Qt)):
+        raise RuntimeError("GUI libraries not available")
     progress = QProgressDialog(
         tr("Checking for updates..."), "", 0, 0, parent
     )
