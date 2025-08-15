@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QListView,
     QCheckBox,
+    QHeaderView,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
@@ -84,7 +85,8 @@ class SplitMappingDialog(QDialog):
         for idx, orig in enumerate(keep_idx):
             header_value = filtered_headers[idx] if filtered_headers[idx] is not None else ""
             letter = get_column_letter(orig + 1)
-            header_labels.append(f"{letter}: {header_value}")
+            # Show column letter on a separate line to make it always visible
+            header_labels.append(f"{letter}\n{header_value}")
         model.setHorizontalHeaderLabels(header_labels)
         for row in rows_for_preview:
             filtered_row = [row[i] if i < len(row) else None for i in keep_idx]
@@ -132,6 +134,8 @@ class SplitMappingDialog(QDialog):
         self.table.setSelectionBehavior(QTableView.SelectItems)
         self.header_view = DraggableHeaderView(Qt.Horizontal, self.table)
         self.table.setHorizontalHeader(self.header_view)
+        # Ensure the column letters remain visible even with long headers
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.header_view.dragSelectionChanged.connect(self.handle_drag)
         self.header_view.rightClicked.connect(self.handle_right_click)
         self.table.horizontalHeader().setStretchLastSection(False)
