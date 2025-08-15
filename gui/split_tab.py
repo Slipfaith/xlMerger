@@ -34,7 +34,7 @@ class SplitTab(QWidget):
         self.file_input.setMinimumHeight(40)
         left.addWidget(self.file_input)
 
-        self.config_btn = QPushButton(tr("Превью"))
+        self.config_btn = QPushButton(tr("Настроить"))
         self.config_btn.clicked.connect(self.open_mapping_dialog)
         left.addWidget(self.config_btn)
 
@@ -118,7 +118,7 @@ class SplitTab(QWidget):
     def retranslate_ui(self):
         self.setWindowTitle(tr("xlSpliter"))
         self.split_btn.setText(tr("Разделить"))
-        self.config_btn.setText(tr("Превью"))
+        self.config_btn.setText(tr("Настроить"))
         self.file_input.setPlaceholderText(tr("Перетащи сюда эксель"))
         self._update_current_label()
         # update labels - they are static but to refresh we need to re-add them? Not necessary

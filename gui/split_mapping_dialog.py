@@ -9,10 +9,12 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QComboBox,
     QListView,
+    QCheckBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 from itertools import islice
 
 from gui.limits_checker import DraggableHeaderView
@@ -34,6 +36,8 @@ class SplitMappingDialog(QDialog):
         self.models: dict[str, QStandardItemModel] = {}
         # columns that contain at least one non-empty value for each sheet
         self.non_empty_cols: dict[str, set[int]] = {}
+        # mapping from sheet name to original column indices
+        self.col_indices: dict[str, list[int]] = {}
         # Keep track of which sheets already have preview data loaded
         self._loaded: set[str] = set()
         self.configs = {
@@ -73,11 +77,15 @@ class SplitMappingDialog(QDialog):
                     non_empty.add(idx)
 
         keep_idx = sorted(non_empty)
+        self.col_indices[sheet_name] = keep_idx
         filtered_headers = [headers[i] for i in keep_idx]
         model = QStandardItemModel()
-        model.setHorizontalHeaderLabels(
-            [str(h) if h is not None else "" for h in filtered_headers]
-        )
+        header_labels = []
+        for idx, orig in enumerate(keep_idx):
+            header_value = filtered_headers[idx] if filtered_headers[idx] is not None else ""
+            letter = get_column_letter(orig + 1)
+            header_labels.append(f"{letter}: {header_value}")
+        model.setHorizontalHeaderLabels(header_labels)
         for row in rows_for_preview:
             filtered_row = [row[i] if i < len(row) else None for i in keep_idx]
             items = [
@@ -107,6 +115,10 @@ class SplitMappingDialog(QDialog):
             self.sheet_combo.currentTextChanged.connect(self.switch_sheet)
             layout.addWidget(self.sheet_combo)
 
+            self.apply_all_checkbox = QCheckBox(tr("Применить настройки первого листа ко всем листам"))
+            self.apply_all_checkbox.toggled.connect(self._toggle_apply_all)
+            layout.addWidget(self.apply_all_checkbox)
+
         info = QLabel(
             tr("Выбери исходный столбец (синий) и столбцы перевода (зелёный).")
         )
@@ -131,8 +143,11 @@ class SplitMappingDialog(QDialog):
         self.extra_list.setWrapping(True)
         self.extra_list.setMaximumHeight(80)
         non_empty = self.non_empty_cols.get(self.current_sheet, set())
+        indices = self.col_indices.get(self.current_sheet, [])
         for idx, h in enumerate(self.headers):
-            item = QListWidgetItem(h)
+            letter = get_column_letter(indices[idx] + 1) if idx < len(indices) else ""
+            item = QListWidgetItem(f"{letter}: {h}")
+            item.setData(Qt.UserRole, idx)
             if idx not in non_empty:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
                 item.setForeground(QBrush(QColor("gray")))
@@ -168,6 +183,12 @@ class SplitMappingDialog(QDialog):
         cfg["targets"] = set(self.target_cols)
         cfg["extra"] = set(self.extra_cols)
 
+    def _toggle_apply_all(self, checked: bool):
+        if hasattr(self, "sheet_combo"):
+            self.sheet_combo.setEnabled(not checked)
+            if checked:
+                self.sheet_combo.setCurrentIndex(0)
+
     def switch_sheet(self, name: str):
         self._save_current()
         self.current_sheet = name
@@ -189,11 +210,13 @@ class SplitMappingDialog(QDialog):
         self.extra_list.clear()
         non_empty = self.non_empty_cols.get(self.current_sheet, set())
         excluded = {self.source_col} | set(self.target_cols)
+        indices = self.col_indices.get(self.current_sheet, [])
         new_extra = set()
         for idx, h in enumerate(self.headers):
             if idx in excluded:
                 continue
-            item = QListWidgetItem(h)
+            letter = get_column_letter(indices[idx] + 1) if idx < len(indices) else ""
+            item = QListWidgetItem(f"{letter}: {h}")
             item.setData(Qt.UserRole, idx)
             if idx not in non_empty:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
@@ -275,14 +298,22 @@ class SplitMappingDialog(QDialog):
         if self.source_col is None:
             txt = f"{tr('Источник')}: —\n{tr('Цели')}: —\n{tr('Доп')}: —"
         else:
-            src = self.headers[self.source_col]
+            indices = self.col_indices.get(self.current_sheet, [])
+            src_letter = get_column_letter(indices[self.source_col] + 1) if self.source_col < len(indices) else ""
+            src = f"{src_letter}: {self.headers[self.source_col]}"
             tgts = (
-                [self.headers[c] for c in sorted(self.target_cols)]
+                [
+                    f"{get_column_letter(indices[c] + 1) if c < len(indices) else ''}: {self.headers[c]}"
+                    for c in sorted(self.target_cols)
+                ]
                 if self.target_cols
                 else ["—"]
             )
             extras = (
-                [self.headers[c] for c in sorted(self.extra_cols)]
+                [
+                    f"{get_column_letter(indices[c] + 1) if c < len(indices) else ''}: {self.headers[c]}"
+                    for c in sorted(self.extra_cols)
+                ]
                 if self.extra_cols
                 else ["—"]
             )
@@ -298,6 +329,24 @@ class SplitMappingDialog(QDialog):
 
     def get_selection(self):
         self._save_current()
+        if hasattr(self, "apply_all_checkbox") and self.apply_all_checkbox.isChecked():
+            base_cfg = self.configs[self.sheet_names[0]]
+            if base_cfg["src"] is None:
+                return {}
+            result = {}
+            for sheet in self.sheet_names:
+                if sheet not in self._loaded:
+                    self._load_preview(sheet)
+                headers = self.headers_map[sheet]
+                src_idx = base_cfg["src"]
+                if src_idx >= len(headers):
+                    continue
+                src = headers[src_idx]
+                tgts = [headers[c] for c in sorted(base_cfg["targets"]) if c < len(headers)]
+                extras = [headers[c] for c in sorted(base_cfg["extra"]) if c < len(headers)]
+                result[sheet] = (src, tgts, extras)
+            return result
+
         result = {}
         for sheet, cfg in self.configs.items():
             if cfg["src"] is None:
