@@ -2,6 +2,29 @@ import os
 from openpyxl import Workbook, load_workbook
 from core.split_excel import split_excel_by_languages, split_excel_multiple_sheets
 
+
+def test_split_excel_without_header(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append([None, None])
+    ws.append(["привет", "hallo"])
+    wb.save(src)
+    wb.close()
+
+    split_excel_by_languages(str(src), "Sheet1", "A", target_langs=["B"])
+
+    out_file = tmp_path / "main_A-B.xlsx"
+    assert out_file.is_file()
+    wb_out = load_workbook(out_file)
+    ws_out = wb_out.active
+    assert ws_out.cell(row=1, column=1).value == "A"
+    assert ws_out.cell(row=1, column=2).value == "B"
+    assert ws_out.cell(row=2, column=1).value == "привет"
+    assert ws_out.cell(row=2, column=2).value == "hallo"
+    wb_out.close()
+
 def test_split_excel(tmp_path):
     src = tmp_path / "main.xlsx"
     wb = Workbook()
