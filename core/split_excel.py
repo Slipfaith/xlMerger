@@ -61,22 +61,37 @@ def split_excel_by_languages(
     sheet_name : str
         Name of the sheet to process.
     source_lang : str
-        Column header that contains source text.
+        Column header or column letter that contains source text.
     output_dir : str | None, optional
         Directory where new files will be saved. Defaults to the Excel file
         directory.
     target_langs : list[str] | None, optional
         List of target language columns to include. If ``None`` all language
         columns are used.
+        Column names or letters are accepted.
     extra_columns : list[str] | None, optional
-        Additional columns to copy to each output file.
+        Additional columns (by name or letter) to copy to each output file.
     progress_callback : Callable[[int, int, str], None] | None, optional
         Called after each file is saved with ``(index, total, name)``.
     """
     wb = load_workbook(excel_path)
     sheet = wb[sheet_name]
-    headers = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
-    header_map = {str(h): idx + 1 for idx, h in enumerate(headers) if h is not None}
+    # Map column letters and available header names to indices. Keep a
+    # preferred name for each index: the header value if present, otherwise
+    # the column letter.
+    header_map: Dict[str, int] = {}
+    col_names: Dict[int, str] = {}
+    first_row = next(sheet.iter_rows(min_row=1, max_row=1))
+    for idx, cell in enumerate(first_row, start=1):
+        letter = get_column_letter(idx)
+        header_map[letter] = idx
+        val = cell.value
+        if val not in (None, ""):
+            name = str(val)
+            header_map[name] = idx
+        else:
+            name = letter
+        col_names[idx] = name
 
     if source_lang not in header_map:
         wb.close()
@@ -85,43 +100,45 @@ def split_excel_by_languages(
     if output_dir is None:
         output_dir = os.path.dirname(excel_path)
 
+    target_indices = None
     if target_langs:
         missing = [t for t in target_langs if t not in header_map]
         if missing:
             wb.close()
             raise ValueError(f"Target column(s) {', '.join(missing)} not found")
+        target_indices = {header_map[t] for t in target_langs}
 
     targets: List[tuple[str, int]] = []
-    for target_lang, idx in header_map.items():
-        if target_lang == source_lang:
+    source_idx = header_map[source_lang]
+    source_header = col_names[source_idx]
+    for idx, name in col_names.items():
+        if idx == source_idx:
             continue
-        if target_langs is not None:
-            if target_lang not in target_langs:
+        if target_indices is not None:
+            if idx not in target_indices:
                 continue
         else:
-            if not _is_lang_column(target_lang):
+            if not _is_lang_column(name):
                 continue
-        targets.append((target_lang, idx))
+        targets.append((name, idx))
 
     extra_idx: List[int] = []
     extra_headers: List[str] = []
     if extra_columns:
         for col in extra_columns:
-            if col in header_map and col not in [source_lang]:
-                extra_idx.append(header_map[col])
-                extra_headers.append(col)
+            if col in header_map and header_map[col] != source_idx:
+                idx = header_map[col]
+                extra_idx.append(idx)
+                extra_headers.append(col_names[idx])
 
     created: List[str] = []
-
-    source_idx = header_map[source_lang]
-
     for i, (target_lang, idx) in enumerate(targets, start=1):
         new_wb = Workbook()
         ws_new = new_wb.active
         ws_new.title = sheet_name
         col_pos = 1
         _copy_cell(sheet.cell(row=1, column=source_idx), ws_new.cell(row=1, column=col_pos))
-        ws_new.cell(row=1, column=col_pos).value = source_lang
+        ws_new.cell(row=1, column=col_pos).value = source_header
         _copy_column_width(sheet, ws_new, source_idx, col_pos)
         col_pos += 1
         _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
@@ -145,7 +162,7 @@ def split_excel_by_languages(
                 _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
         base, ext = os.path.splitext(os.path.basename(excel_path))
-        out_name = f"{base}_{source_lang}-{target_lang}{ext}"
+        out_name = f"{base}_{source_header}-{target_lang}{ext}"
         out_path = os.path.join(output_dir, out_name)
         new_wb.save(out_path)
         new_wb.close()
@@ -171,6 +188,7 @@ def split_excel_multiple_sheets(
         Path to the source Excel file.
     sheet_configs : Dict[str, Tuple[str, List[str] | None, List[str] | None]]
         Mapping of sheet name to ``(source_lang, target_langs, extra_columns)``.
+        Columns can be referenced by header names or by column letters.
     output_dir : str | None, optional
         Directory where new files will be saved. Defaults to the Excel file
         directory.
@@ -184,6 +202,7 @@ def split_excel_multiple_sheets(
 
     workbooks: Dict[str, Workbook] = {}
     created: List[str] = []
+    source_names: set[str] = set()
 
     def get_wb(target: str) -> Workbook:
         if target not in workbooks:
@@ -193,13 +212,29 @@ def split_excel_multiple_sheets(
 
     for sheet_name, (src, targets, extras) in sheet_configs.items():
         sheet = wb[sheet_name]
-        headers = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
-        header_map = {str(h): idx + 1 for idx, h in enumerate(headers) if h is not None}
+        header_map: Dict[str, int] = {}
+        col_names: Dict[int, str] = {}
+        first_row = next(sheet.iter_rows(min_row=1, max_row=1))
+        for idx, cell in enumerate(first_row, start=1):
+            letter = get_column_letter(idx)
+            header_map[letter] = idx
+            val = cell.value
+            if val not in (None, ""):
+                name = str(val)
+                header_map[name] = idx
+            else:
+                name = letter
+            col_names[idx] = name
 
         if src not in header_map:
             wb.close()
             raise ValueError(f"Source column '{src}' not found in sheet '{sheet_name}'")
 
+        src_idx = header_map[src]
+        src_name = col_names[src_idx]
+        source_names.add(src_name)
+
+        target_indices = None
         if targets:
             missing = [t for t in targets if t not in header_map]
             if missing:
@@ -207,31 +242,31 @@ def split_excel_multiple_sheets(
                 raise ValueError(
                     f"Target column(s) {', '.join(missing)} not found in sheet '{sheet_name}'"
                 )
+            target_indices = {header_map[t] for t in targets}
 
         col_targets: List[Tuple[str, int]] = []
-        for tgt, idx in header_map.items():
-            if tgt == src:
+        for idx, name in col_names.items():
+            if idx == src_idx:
                 continue
-            if targets is not None:
-                if tgt not in targets:
+            if target_indices is not None:
+                if idx not in target_indices:
                     continue
             else:
-                if not _is_lang_column(tgt):
+                if not _is_lang_column(name):
                     continue
-            col_targets.append((tgt, idx))
+            col_targets.append((name, idx))
 
         extra_idx: List[int] = []
         extra_headers: List[str] = []
         if extras:
             for col in extras:
-                if col in header_map and col not in [src]:
-                    extra_idx.append(header_map[col])
-                    extra_headers.append(col)
+                if col in header_map and header_map[col] != src_idx:
+                    i = header_map[col]
+                    extra_idx.append(i)
+                    extra_headers.append(col_names[i])
 
-        src_idx = header_map[src]
-
-        for tgt, idx in col_targets:
-            wb_out = get_wb(tgt)
+        for tgt_name, idx in col_targets:
+            wb_out = get_wb(tgt_name)
             if sheet_name in wb_out.sheetnames:
                 ws_new = wb_out[sheet_name]
             else:
@@ -240,11 +275,11 @@ def split_excel_multiple_sheets(
             if ws_new.max_row == 1 and ws_new.max_column == 1 and ws_new.cell(row=1, column=1).value is None:
                 col_pos = 1
                 _copy_cell(sheet.cell(row=1, column=src_idx), ws_new.cell(row=1, column=col_pos))
-                ws_new.cell(row=1, column=col_pos).value = src
+                ws_new.cell(row=1, column=col_pos).value = src_name
                 _copy_column_width(sheet, ws_new, src_idx, col_pos)
                 col_pos += 1
                 _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
-                ws_new.cell(row=1, column=col_pos).value = tgt
+                ws_new.cell(row=1, column=col_pos).value = tgt_name
                 _copy_column_width(sheet, ws_new, idx, col_pos)
                 col_pos += 1
                 for header in extra_headers:
@@ -266,7 +301,7 @@ def split_excel_multiple_sheets(
                     col_pos += 1
 
     base, ext = os.path.splitext(os.path.basename(excel_path))
-    sources = {cfg[0] for cfg in sheet_configs.values()}
+    sources = source_names
 
     for i, (tgt, new_wb) in enumerate(workbooks.items(), start=1):
         src_part = next(iter(sources)) if len(sources) == 1 else "src"
