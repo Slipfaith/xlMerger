@@ -1,6 +1,7 @@
 from openpyxl import load_workbook, Workbook
 from copy import copy
 import os
+import subprocess
 from typing import Callable, List, Dict, Tuple
 from openpyxl.utils import get_column_letter
 
@@ -41,6 +42,27 @@ def _find_last_data_row(sheet, columns: List[int]) -> int:
             if val not in (None, ""):
                 return row_idx
     return 1
+
+
+def _run_excelltru(file_path: str) -> None:
+    """Run the ``Excelltru.vbs`` script for ``file_path`` if available.
+
+    The script creates a copy of the Excel file with the ``_totr`` suffix.
+    Execution is skipped on non-Windows platforms or when the script is not
+    present. Errors from the external process are suppressed.
+    """
+
+    if os.name != "nt":  # Only available on Windows
+        return
+
+    vbs_path = os.path.join(os.path.dirname(__file__), "Excelltru.vbs")
+    if not os.path.isfile(vbs_path):
+        return
+
+    try:
+        subprocess.run(["cscript.exe", "//nologo", vbs_path, file_path], check=True)
+    except Exception:
+        pass
 
 
 def split_excel_by_languages(
@@ -166,6 +188,7 @@ def split_excel_by_languages(
         out_path = os.path.join(output_dir, out_name)
         new_wb.save(out_path)
         new_wb.close()
+        _run_excelltru(out_path)
         created.append(out_path)
         if progress_callback:
             progress_callback(i, len(targets), out_name)
@@ -309,6 +332,7 @@ def split_excel_multiple_sheets(
         out_path = os.path.join(output_dir, out_name)
         new_wb.save(out_path)
         new_wb.close()
+        _run_excelltru(out_path)
         created.append(out_path)
         if progress_callback:
             progress_callback(i, len(workbooks), out_name)
