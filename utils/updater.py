@@ -4,8 +4,8 @@ import subprocess
 import tempfile
 import requests
 
-PREVIOUS_VERSION = "2.2"
-CURRENT_VERSION = "2.2.1"
+PREVIOUS_VERSION = "2.2.1"
+CURRENT_VERSION = "2.2.2"
 __version__ = CURRENT_VERSION
 
 try:
