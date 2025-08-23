@@ -96,9 +96,18 @@ class SplitMappingDialog(QDialog):
             ]
             model.appendRow(items)
 
-        self.headers_map[sheet_name] = [
-            str(h) if h is not None else "" for h in filtered_headers
-        ]
+        # Store header names for later retrieval. If a column header is empty,
+        # fallback to its column letter so that downstream functions can
+        # reference the column correctly. Previously an empty string was stored
+        # which caused "source column '' not found" errors when splitting files
+        # with a blank first row.
+        names: list[str] = []
+        for i, h in enumerate(filtered_headers):
+            if h is not None and str(h).strip() != "":
+                names.append(str(h))
+            else:
+                names.append(get_column_letter(keep_idx[i] + 1))
+        self.headers_map[sheet_name] = names
         self.models[sheet_name] = model
         self.non_empty_cols[sheet_name] = set(range(len(keep_idx)))
         self._loaded.add(sheet_name)
