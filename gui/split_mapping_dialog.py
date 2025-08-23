@@ -143,11 +143,17 @@ class SplitMappingDialog(QDialog):
         self.table.setSelectionBehavior(QTableView.SelectItems)
         self.header_view = DraggableHeaderView(Qt.Horizontal, self.table)
         self.table.setHorizontalHeader(self.header_view)
-        # Ensure the column letters remain visible even with long headers
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        # Allow user control over column sizes instead of auto-resizing
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setMinimumSectionSize(70)
+        header.setDefaultSectionSize(120)
+        header.sectionResized.connect(self._handle_section_resized)
+        self.table.setWordWrap(True)
+        self.table.resizeRowsToContents()
         self.header_view.dragSelectionChanged.connect(self.handle_drag)
         self.header_view.rightClicked.connect(self.handle_right_click)
-        self.table.horizontalHeader().setStretchLastSection(False)
+        header.setStretchLastSection(False)
         layout.addWidget(self.table)
 
         layout.addWidget(QLabel(tr("Дополнительные столбцы:")))
@@ -188,7 +194,8 @@ class SplitMappingDialog(QDialog):
         self.update_colors()
         self.update_label()
         self.resize(700, 500)
-        self.setFixedSize(self.size())
+        self.setMinimumSize(500, 400)
+        self._reset_column_widths()
 
     def _save_current(self):
         cfg = self.configs[self.current_sheet]
@@ -202,6 +209,23 @@ class SplitMappingDialog(QDialog):
             if checked:
                 self.sheet_combo.setCurrentIndex(0)
 
+    def _handle_section_resized(self, index: int, old: int, new: int):
+        """Clamp column widths to keep them readable and update row heights."""
+        min_w, max_w = 70, 200
+        if new < min_w:
+            self.table.horizontalHeader().resizeSection(index, min_w)
+        elif new > max_w:
+            self.table.horizontalHeader().resizeSection(index, max_w)
+        self.table.resizeRowsToContents()
+
+    def _reset_column_widths(self):
+        """Reset column widths to the default size respecting limits."""
+        header = self.table.horizontalHeader()
+        default = header.defaultSectionSize()
+        for i in range(self.model.columnCount()):
+            header.resizeSection(i, default)
+        self.table.resizeRowsToContents()
+
     def switch_sheet(self, name: str):
         self._save_current()
         self.current_sheet = name
@@ -210,6 +234,7 @@ class SplitMappingDialog(QDialog):
         self.model = self.models[name]
         self.headers = self.headers_map[name]
         self.table.setModel(self.model)
+        self._reset_column_widths()
         cfg = self.configs[name]
         self.source_col = cfg["src"]
         self.target_cols = set(cfg["targets"])
