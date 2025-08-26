@@ -26,6 +26,7 @@ def _copy_cell(src, dst):
         dst.protection = copy(src.protection)
         dst.alignment = copy(src.alignment)
 
+
 def _copy_column_width(src_sheet, dst_sheet, src_idx: int, dst_idx: int):
     src_letter = get_column_letter(src_idx)
     dst_letter = get_column_letter(dst_idx)
@@ -45,14 +46,9 @@ def _find_last_data_row(sheet, columns: List[int]) -> int:
 
 
 def _run_excelltru(file_path: str) -> None:
-    """Run the ``Excelltru.vbs`` script for ``file_path`` if available.
+    """Запуск Excelltru.vbs для file_path (только на Windows)."""
 
-    The script creates a copy of the Excel file with the ``_totr`` suffix.
-    Execution is skipped on non-Windows platforms or when the script is not
-    present. Errors from the external process are suppressed.
-    """
-
-    if os.name != "nt":  # Only available on Windows
+    if os.name != "nt":
         return
 
     vbs_path = os.path.join(os.path.dirname(__file__), "Excelltru.vbs")
@@ -60,9 +56,15 @@ def _run_excelltru(file_path: str) -> None:
         return
 
     try:
-        subprocess.run(["cscript.exe", "//nologo", vbs_path, file_path], check=True)
-    except Exception:
-        pass
+        norm_path = os.path.normpath(file_path)
+        # Оборачиваем путь в кавычки — для пробелов и кириллицы
+        subprocess.run(
+            ["cscript.exe", "//nologo", vbs_path, f'"{norm_path}"'],
+            check=True,
+            shell=True
+        )
+    except Exception as e:
+        print(f"⚠ Ошибка при запуске Excelltru.vbs: {e}")
 
 
 def split_excel_by_languages(
@@ -74,33 +76,10 @@ def split_excel_by_languages(
     extra_columns: list[str] | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> List[str]:
-    """Split Excel into language pairs.
-
-    Parameters
-    ----------
-    excel_path : str
-        Path to the source Excel file.
-    sheet_name : str
-        Name of the sheet to process.
-    source_lang : str
-        Column header or column letter that contains source text.
-    output_dir : str | None, optional
-        Directory where new files will be saved. Defaults to the Excel file
-        directory.
-    target_langs : list[str] | None, optional
-        List of target language columns to include. If ``None`` all language
-        columns are used.
-        Column names or letters are accepted.
-    extra_columns : list[str] | None, optional
-        Additional columns (by name or letter) to copy to each output file.
-    progress_callback : Callable[[int, int, str], None] | None, optional
-        Called after each file is saved with ``(index, total, name)``.
-    """
+    """Split Excel into language pairs."""
     wb = load_workbook(excel_path)
     sheet = wb[sheet_name]
-    # Map column letters and available header names to indices. Keep a
-    # preferred name for each index: the header value if present, otherwise
-    # the column letter.
+
     header_map: Dict[str, int] = {}
     col_names: Dict[int, str] = {}
     first_row = next(sheet.iter_rows(min_row=1, max_row=1))
@@ -203,21 +182,7 @@ def split_excel_multiple_sheets(
     output_dir: str | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> List[str]:
-    """Split multiple sheets preserving sheet names.
-
-    Parameters
-    ----------
-    excel_path : str
-        Path to the source Excel file.
-    sheet_configs : Dict[str, Tuple[str, List[str] | None, List[str] | None]]
-        Mapping of sheet name to ``(source_lang, target_langs, extra_columns)``.
-        Columns can be referenced by header names or by column letters.
-    output_dir : str | None, optional
-        Directory where new files will be saved. Defaults to the Excel file
-        directory.
-    progress_callback : Callable[[int, int, str], None] | None, optional
-        Called after each file is saved.
-    """
+    """Split multiple sheets preserving sheet names."""
     wb = load_workbook(excel_path)
 
     if output_dir is None:
