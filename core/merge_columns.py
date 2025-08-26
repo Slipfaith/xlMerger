@@ -1,6 +1,10 @@
 import os
+import hashlib
 from typing import List, Dict
+from copy import copy as copy_style
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+from openpyxl.utils import column_index_from_string
 
 
 def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], output_file: str | None = None,
@@ -52,9 +56,14 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
             ws_src = wb_src.active
 
             for s_col, t_col in zip(src_cols, tgt_cols):
-                for cell in ws_src[s_col]:
-                    if cell.value is not None:
-                        ws_main[f"{t_col}{cell.row}"] = cell.value
+                s_idx = column_index_from_string(s_col)
+                t_idx = column_index_from_string(t_col)
+                for row in range(1, ws_src.max_row + 1):
+                    source_cell = ws_src.cell(row=row, column=s_idx)
+                    if source_cell.value is None:
+                        continue
+                    target_cell = ws_main.cell(row=row, column=t_idx)
+                    _set_cell_with_retry(target_cell, source_cell)
             wb_src.close()
 
             if progress_callback:
@@ -67,3 +76,37 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
         return output_file
     finally:
         wb_main.close()
+
+
+def _set_cell_with_retry(target_cell, source_cell, max_attempts: int = 5) -> None:
+    """Copy the value and style from ``source_cell`` to ``target_cell`` with retries.
+
+    Some environments sporadically fail to write long text values on the first try.
+    This helper ensures the full text is written by verifying the value hash after
+    each attempt. Failed writes are highlighted in red.
+    """
+
+    def compute_hash(text):
+        if text is None:
+            text = ""
+        return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
+
+    value = source_cell.value
+    source_hash = compute_hash(value)
+
+    for _ in range(max_attempts):
+        target_cell.value = value
+        # copy basic formatting to mimic a real copy-paste
+        target_cell.font = copy_style(source_cell.font)
+        target_cell.border = copy_style(source_cell.border)
+        target_cell.fill = copy_style(source_cell.fill)
+        target_cell.number_format = source_cell.number_format
+        target_cell.protection = copy_style(source_cell.protection)
+        target_cell.alignment = copy_style(source_cell.alignment)
+
+        if target_cell.value == value and compute_hash(target_cell.value) == source_hash:
+            return
+
+    # mark the cell red if we failed to copy value correctly
+    target_cell.fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+
