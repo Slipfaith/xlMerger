@@ -55,26 +55,27 @@ class ExcelProcessor:
         try:
             return utils.column_index_from_string(column_key)
         except ValueError:
+            # provide sheet name for easier debugging
             self.logger.log_error(
-                f"Некорректное обозначение столбца '{column_key}'", "", "", sheet_name
+                f"Некорректное обозначение столбца '{column_key}'", sheet=sheet_name
             )
             raise
 
     def validate_paths_and_column(self):
         if self.folder_path and not os.path.isdir(self.folder_path):
-            self.logger.log_error("Папка перевода не найдена", "", "", self.folder_path)
+            self.logger.log_error("Папка перевода не найдена", value=self.folder_path)
             raise FileNotFoundError("Указанная папка не существует.")
         if not os.path.exists(self.main_excel_path):
-            self.logger.log_error("Файл Excel не найден", "", "", self.main_excel_path)
+            self.logger.log_error("Файл Excel не найден", value=self.main_excel_path)
             raise FileNotFoundError("Указанный файл Excel не существует.")
         if not self.copy_column:
-            self.logger.log_error("Не указан столбец для копирования", "", "", "")
+            self.logger.log_error("Не указан столбец для копирования")
             raise ValueError("Укажите столбец для копирования.")
 
     def copy_data(self, progress_callback=None):
         self.validate_paths_and_column()
         if not self.selected_sheets:
-            self.logger.log_error("Не выбраны листы", "", "", "")
+            self.logger.log_error("Не выбраны листы")
             raise ValueError("Выберите хотя бы один лист.")
 
         base, ext = os.path.splitext(self.main_excel_path)
@@ -89,7 +90,9 @@ class ExcelProcessor:
             self.columns[sheet_name] = [
                 cell.value for cell in workbook[sheet_name][header_row_index + 1]
             ]
-            self.logger.log_info(f"Обрабатывается лист: {sheet_name}")
+            self.logger.log_info(
+                f"Обрабатывается лист: {sheet_name}; заголовки: {self.columns[sheet_name]}"
+            )
         workbook.close()
 
         is_file_mapping = bool(self.file_to_column)
@@ -104,7 +107,10 @@ class ExcelProcessor:
                 if not column_name:
                     continue
                 if column_name not in self.columns[sheet_name]:
-                    self.logger.log_error(f"Столбец '{column_name}' не найден на листе '{sheet_name}'", "", "", name)
+                    self.logger.log_error(
+                        f"Столбец '{column_name}' не найден на листе '{sheet_name}'",
+                        value=name,
+                    )
                     raise Exception(
                         f"Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel."
                     )
@@ -112,11 +118,15 @@ class ExcelProcessor:
                 col_index = self.columns[sheet_name].index(column_name) + 1
                 if is_file_mapping:
                     file_path = os.path.join(self.folder_path, name)
-                    self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {column_name}")
+                    self.logger.log_info(
+                        f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {column_name} -> {self.copy_column}"
+                    )
                     self._copy_from_file(file_path, sheet_name, copy_col_index, header_row, col_index)
                 else:
                     lang_folder_path = os.path.join(self.folder_path, name)
-                    self.logger.log_info(f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {column_name}")
+                    self.logger.log_info(
+                        f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {column_name} -> {self.copy_column}"
+                    )
                     self._copy_from_folder(lang_folder_path, sheet_name, copy_col_index, header_row, col_index)
                 progress += 1
                 if progress_callback:
@@ -137,7 +147,9 @@ class ExcelProcessor:
             return lang_wb.sheetnames[0]
         else:
             sheets = ', '.join(lang_wb.sheetnames)
-            self.logger.log_error(f"Не найден лист '{main_sheet_name}'", "", "", sheets)
+            self.logger.log_error(
+                f"Не найден лист '{main_sheet_name}'", value=sheets
+            )
             raise Exception(
                 f"Не найден лист '{main_sheet_name}' в файле перевода. "
                 f"В файле листы: {sheets}. "
@@ -164,7 +176,7 @@ class ExcelProcessor:
         try:
             import xlwings as xw
         except Exception as e:
-            self.logger.log_error("xlwings недоступен", "", "", str(e))
+            self.logger.log_error("xlwings недоступен", value=str(e))
             return
 
         app = main_wb = lang_wb = None
@@ -179,22 +191,26 @@ class ExcelProcessor:
             src_col_letter = utils.get_column_letter(copy_col_index)
             dst_col_letter = utils.get_column_letter(col_index)
             last_row = source_sheet.range((source_sheet.cells.last_cell.row, copy_col_index)).end('up').row
+            self.logger.log_info(
+                f"Лист '{sheet_name}': источник {src_col_letter}, цель {dst_col_letter}, последняя строка {last_row}"
+            )
 
             def copy_range(r1, r2, dest_start):
+                """Copy cells one by one so empty values don't overwrite data."""
                 if r2 < r1:
                     return
-                src_range = source_sheet.range(f"{src_col_letter}{r1}:{src_col_letter}{r2}")
-                dst_range = target_sheet.range(f"{dst_col_letter}{dest_start}:{dst_col_letter}{dest_start + (r2 - r1)}")
-                src_range.api.Copy(dst_range.api)
-                values = src_range.value
-                if not isinstance(values, list):
-                    values = [values]
-                for idx, val in enumerate(values, start=0):
-                    if isinstance(val, list):
-                        val = val[0]
+                dest_end = dest_start + (r2 - r1)
+                self.logger.log_info(
+                    f"Диапазон {src_col_letter}{r1}:{src_col_letter}{r2} -> {dst_col_letter}{dest_start}:{dst_col_letter}{dest_end}"
+                )
+                for offset, row in enumerate(range(r1, r2 + 1)):
+                    src_cell = source_sheet.range(f"{src_col_letter}{row}")
+                    val = src_cell.value
                     if val is None or (isinstance(val, str) and val.strip() == ""):
                         continue
-                    self.logger.log_copy(sheet_name, dest_start + idx, col_index, val)
+                    dst_cell = target_sheet.range(f"{dst_col_letter}{dest_start + offset}")
+                    src_cell.api.Copy(dst_cell.api)
+                    self.logger.log_copy(sheet_name, dest_start + offset, col_index, val)
 
             if header_row > 0:
                 copy_range(1, header_row, 1 if self.copy_by_row_number else header_row + 1)
@@ -204,7 +220,9 @@ class ExcelProcessor:
 
             main_wb.save()
         except Exception as e:
-            self.logger.log_error("Ошибка при копировании через Excel", "", "", f"{lang_file_path}: {e}")
+            self.logger.log_error(
+                "Ошибка при копировании через Excel", value=f"{lang_file_path}: {e}"
+            )
         finally:
             if lang_wb:
                 lang_wb.close()
