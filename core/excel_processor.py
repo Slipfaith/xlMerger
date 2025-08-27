@@ -47,6 +47,19 @@ class ExcelProcessor:
         wb.close()
         return cols
 
+    def _resolve_column_index(self, sheet_name, column_key):
+        """Return 1-based column index for a letter or header name."""
+        columns = self.columns.get(sheet_name, [])
+        if column_key in columns:
+            return columns.index(column_key) + 1
+        try:
+            return utils.column_index_from_string(column_key)
+        except ValueError:
+            self.logger.log_error(
+                f"Некорректное обозначение столбца '{column_key}'", "", "", sheet_name
+            )
+            raise
+
     def validate_paths_and_column(self):
         if self.folder_path and not os.path.isdir(self.folder_path):
             self.logger.log_error("Папка перевода не найдена", "", "", self.folder_path)
@@ -85,7 +98,7 @@ class ExcelProcessor:
         progress = 0
 
         for sheet_name in self.selected_sheets:
-            copy_col_index = utils.column_index_from_string(self.sheet_to_column[sheet_name])
+            copy_col_index = self._resolve_column_index(sheet_name, self.sheet_to_column[sheet_name])
             header_row = self.header_row[sheet_name]
             for name, column_name in items:
                 if not column_name:
