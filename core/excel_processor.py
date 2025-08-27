@@ -1,9 +1,7 @@
 import os
-import hashlib
+import shutil
 from openpyxl import load_workbook
 import openpyxl.utils as utils
-from openpyxl.styles import PatternFill
-from copy import copy as copy_style
 
 from utils.logger import Logger
 
@@ -30,6 +28,7 @@ class ExcelProcessor:
         self.workbook = None
         self.columns = {}
         self.header_row = {}
+        self.output_file = None
 
         self.logger = logger or Logger()
 
@@ -65,16 +64,20 @@ class ExcelProcessor:
             self.logger.log_error("Не выбраны листы", "", "", "")
             raise ValueError("Выберите хотя бы один лист.")
 
-        self.workbook = load_workbook(self.main_excel_path)
-        self.logger.log_info(f"Загружен основной Excel: {self.main_excel_path}")
+        base, ext = os.path.splitext(self.main_excel_path)
+        self.output_file = f"{base}_out{ext}"
+        shutil.copyfile(self.main_excel_path, self.output_file)
 
+        workbook = load_workbook(self.main_excel_path, read_only=True)
+        self.logger.log_info(f"Загружен основной Excel: {self.main_excel_path}")
         for sheet_name in self.selected_sheets:
             header_row_index = self.sheet_to_header_row[sheet_name]
             self.header_row[sheet_name] = header_row_index
             self.columns[sheet_name] = [
-                cell.value for cell in self.workbook[sheet_name][header_row_index + 1]
+                cell.value for cell in workbook[sheet_name][header_row_index + 1]
             ]
             self.logger.log_info(f"Обрабатывается лист: {sheet_name}")
+        workbook.close()
 
         is_file_mapping = bool(self.file_to_column)
         items = self.file_to_column.items() if is_file_mapping else self.folder_to_column.items()
@@ -84,7 +87,6 @@ class ExcelProcessor:
         for sheet_name in self.selected_sheets:
             copy_col_index = utils.column_index_from_string(self.sheet_to_column[sheet_name])
             header_row = self.header_row[sheet_name]
-
             for name, column_name in items:
                 if not column_name:
                     continue
@@ -98,26 +100,18 @@ class ExcelProcessor:
                 if is_file_mapping:
                     file_path = os.path.join(self.folder_path, name)
                     self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {column_name}")
-                    self._copy_from_file(
-                        file_path, sheet_name, copy_col_index, header_row, col_index
-                    )
+                    self._copy_from_file(file_path, sheet_name, copy_col_index, header_row, col_index)
                 else:
                     lang_folder_path = os.path.join(self.folder_path, name)
                     self.logger.log_info(f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {column_name}")
-                    self._copy_from_folder(
-                        lang_folder_path, sheet_name, copy_col_index, header_row, col_index
-                    )
+                    self._copy_from_folder(lang_folder_path, sheet_name, copy_col_index, header_row, col_index)
                 progress += 1
                 if progress_callback:
                     progress_callback(progress, total_steps)
 
-        base, ext = os.path.splitext(self.main_excel_path)
-        output_file = f"{base}_out{ext}"
-        self.workbook.save(output_file)
-        self.logger.log_info(f"Файл успешно сохранён: {output_file}")
+        self.logger.log_info(f"Файл успешно сохранён: {self.output_file}")
         self.logger.save()
-        self.workbook.close()
-        return output_file
+        return self.output_file
 
     def _find_matching_sheet(self, lang_wb, main_sheet_name, file_path=None):
         if file_path:
@@ -139,59 +133,69 @@ class ExcelProcessor:
 
     def _copy_from_file(self, file_path, main_sheet_name, copy_col_index, header_row, col_index):
         if os.path.isfile(file_path) and file_path.endswith(('.xlsx', '.xls')):
-            lang_wb = load_workbook(file_path)
+            lang_wb = load_workbook(file_path, read_only=True)
             target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
-            lang_sheet = lang_wb[target_sheet_name]
-            self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
             lang_wb.close()
+            self._copy_from_sheet(file_path, target_sheet_name, main_sheet_name, copy_col_index, header_row, col_index)
 
     def _copy_from_folder(self, lang_folder_path, main_sheet_name, copy_col_index, header_row, col_index):
         for filename in os.listdir(lang_folder_path):
             file_path = os.path.join(lang_folder_path, filename)
             if os.path.isfile(file_path) and filename.endswith(('.xlsx', '.xls')):
-                lang_wb = load_workbook(file_path)
+                lang_wb = load_workbook(file_path, read_only=True)
                 target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
-                lang_sheet = lang_wb[target_sheet_name]
-                self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
                 lang_wb.close()
+                self._copy_from_sheet(file_path, target_sheet_name, main_sheet_name, copy_col_index, header_row, col_index)
 
-    def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
-        for row in range(1, lang_sheet.max_row + 1):
-            if row == header_row + 1:
-                continue  # Всегда пропускаем строку-заголовок (например, 'RU' или что там)
-            source_value = lang_sheet.cell(row=row, column=copy_col_index).value
-            if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
-                continue
-            if self.copy_by_row_number:
-                target_row = row
-            else:
-                offset = 2 if self.skip_first_row else 1
-                target_row = header_row + offset + (row - offset)
-            source_cell = lang_sheet.cell(row=row, column=copy_col_index)
-            self._set_cell(sheet_name, target_row, col_index, source_value, source_cell)
+    def _copy_from_sheet(self, lang_file_path, lang_sheet_name, sheet_name, copy_col_index, header_row, col_index):
+        try:
+            import xlwings as xw
+        except Exception as e:
+            self.logger.log_error("xlwings недоступен", "", "", str(e))
+            return
 
-    def _set_cell(self, sheet_name, target_row, col_index, value, source_cell=None):
-        target_cell = self.workbook[sheet_name].cell(row=target_row, column=col_index)
-        def compute_hash(text):
-            if text is None:
-                text = ""
-            return hashlib.sha256(str(text).encode('utf-8')).hexdigest()
-        source_hash = compute_hash(value)
-        max_attempts = 5
-        for attempt in range(max_attempts):
-            target_cell.value = value
-            if self.preserve_formatting and source_cell is not None:
-                target_cell.font = copy_style(source_cell.font)
-                target_cell.border = copy_style(source_cell.border)
-                target_cell.fill = copy_style(source_cell.fill)
-                target_cell.number_format = source_cell.number_format
-                target_cell.protection = copy_style(source_cell.protection)
-                target_cell.alignment = copy_style(source_cell.alignment)
-            if value == target_cell.value and compute_hash(target_cell.value) == source_hash:
-                # Успешно скопировано — логируем
-                self.logger.log_copy(sheet_name, target_row, col_index, value)
-                break
-        else:
-            fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-            target_cell.fill = fill
-            self.logger.log_error(f"Не удалось записать значение после {max_attempts} попыток", "", "", f"{sheet_name}: R{target_row} C{col_index} [{value}]")
+        app = main_wb = lang_wb = None
+        try:
+            app = xw.App(visible=False, add_book=False)
+            dest_path = os.path.abspath(self.output_file or self.main_excel_path)
+            main_wb = app.books.open(dest_path)
+            lang_wb = app.books.open(os.path.abspath(lang_file_path))
+            source_sheet = lang_wb.sheets[lang_sheet_name]
+            target_sheet = main_wb.sheets[sheet_name]
+
+            src_col_letter = utils.get_column_letter(copy_col_index)
+            dst_col_letter = utils.get_column_letter(col_index)
+            last_row = source_sheet.range((source_sheet.cells.last_cell.row, copy_col_index)).end('up').row
+
+            def copy_range(r1, r2, dest_start):
+                if r2 < r1:
+                    return
+                src_range = source_sheet.range(f"{src_col_letter}{r1}:{src_col_letter}{r2}")
+                dst_range = target_sheet.range(f"{dst_col_letter}{dest_start}:{dst_col_letter}{dest_start + (r2 - r1)}")
+                src_range.api.Copy(dst_range.api)
+                values = src_range.value
+                if not isinstance(values, list):
+                    values = [values]
+                for idx, val in enumerate(values, start=0):
+                    if isinstance(val, list):
+                        val = val[0]
+                    if val is None or (isinstance(val, str) and val.strip() == ""):
+                        continue
+                    self.logger.log_copy(sheet_name, dest_start + idx, col_index, val)
+
+            if header_row > 0:
+                copy_range(1, header_row, 1 if self.copy_by_row_number else header_row + 1)
+
+            start_row = header_row + 2
+            copy_range(start_row, last_row, start_row if self.copy_by_row_number else start_row + header_row)
+
+            main_wb.save()
+        except Exception as e:
+            self.logger.log_error("Ошибка при копировании через Excel", "", "", f"{lang_file_path}: {e}")
+        finally:
+            if lang_wb:
+                lang_wb.close()
+            if main_wb:
+                main_wb.close()
+            if app:
+                app.quit()
