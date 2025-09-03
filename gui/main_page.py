@@ -1,8 +1,15 @@
 # gui/main_page.py
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QRadioButton,
-    QListWidget, QLineEdit
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QCheckBox,
+    QRadioButton,
+    QListWidget,
+    QLineEdit,
 )
 from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
@@ -20,11 +27,14 @@ class MainPageWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        self.apply_styles()
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
         layout.addLayout(self.create_folder_selection_layout())
         layout.addLayout(self.create_excel_selection_layout())
         layout.addLayout(self.create_sheet_selection_layout())
@@ -66,6 +76,7 @@ class MainPageWidget(QWidget):
         self.sheet_list = QListWidget(self)
         self.sheet_list.setSelectionMode(QListWidget.MultiSelection)
         self.sheet_list.setFixedHeight(100)
+        self.sheet_list.setMaximumWidth(200)
         button_layout = QHBoxLayout()
         self.deselect_all_button = QPushButton(tr("Не выбрать все"), self)
         self.select_all_button = QPushButton(tr("Выбрать все"), self)
@@ -123,14 +134,48 @@ class MainPageWidget(QWidget):
 
     def create_preview_button(self):
         self.preview_button = QPushButton(tr("Настроить"), self)
+        self.preview_button.setObjectName("previewButton")
         self.preview_button.clicked.connect(self.previewTriggered)
         return self.preview_button
 
     def create_process_button(self):
         self.process_button = QPushButton(tr("Начать"), self)
-        # Стили убраны, используем стандартный вид с границами
+        self.process_button.setObjectName("processButton")
         self.process_button.clicked.connect(self.processTriggered)
         return self.process_button
+
+    def apply_styles(self):
+        accent_color = "#1976D2"
+        process_color = "#43A047"
+        self.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: white;
+            }}
+            QPushButton#previewButton {{
+                background-color: {accent_color};
+            }}
+            QPushButton#processButton {{
+                background-color: {process_color};
+            }}
+            QListWidget {{
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {accent_color};
+                color: white;
+            }}
+            QLineEdit {{
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                padding: 4px;
+            }}
+            """
+        )
 
     def clear(self):
         self.folder_entry.clear()
