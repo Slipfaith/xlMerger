@@ -4,8 +4,8 @@ import sys
 import subprocess
 import requests
 
-PREVIOUS_VERSION = "2.2.1"
-CURRENT_VERSION = "2.2.2"
+PREVIOUS_VERSION = "2.2.2"
+CURRENT_VERSION = "2.2.3"
 __version__ = CURRENT_VERSION
 
 try:  # pragma: no cover - optional GUI dependencies
