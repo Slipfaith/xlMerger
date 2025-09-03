@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 from openpyxl import load_workbook
 import openpyxl.utils as utils
 
@@ -173,60 +174,33 @@ class ExcelProcessor:
                 self._copy_from_sheet(file_path, target_sheet_name, main_sheet_name, copy_col_index, header_row, col_index)
 
     def _copy_from_sheet(self, lang_file_path, lang_sheet_name, sheet_name, copy_col_index, header_row, col_index):
-        try:
-            import xlwings as xw
-        except Exception as e:
-            self.logger.log_error("xlwings недоступен", value=str(e))
+        if os.name != "nt":
+            self.logger.log_error("VBS копирование поддерживается только в Windows")
             return
 
-        app = main_wb = lang_wb = None
+        vbs_path = os.path.join(os.path.dirname(__file__), "copy_column.vbs")
+        if not os.path.isfile(vbs_path):
+            self.logger.log_error("Файл copy_column.vbs не найден", value=vbs_path)
+            return
+
+        dest_path = os.path.abspath(self.output_file or self.main_excel_path)
+        cmd = [
+            "cscript.exe",
+            "//nologo",
+            vbs_path,
+            os.path.abspath(lang_file_path),
+            lang_sheet_name,
+            str(copy_col_index),
+            dest_path,
+            sheet_name,
+            str(col_index),
+            str(header_row),
+            "1" if self.copy_by_row_number else "0",
+            "1" if self.preserve_formatting else "0",
+        ]
         try:
-            app = xw.App(visible=False, add_book=False)
-            dest_path = os.path.abspath(self.output_file or self.main_excel_path)
-            main_wb = app.books.open(dest_path)
-            lang_wb = app.books.open(os.path.abspath(lang_file_path))
-            source_sheet = lang_wb.sheets[lang_sheet_name]
-            target_sheet = main_wb.sheets[sheet_name]
-
-            src_col_letter = utils.get_column_letter(copy_col_index)
-            dst_col_letter = utils.get_column_letter(col_index)
-            last_row = source_sheet.range((source_sheet.cells.last_cell.row, copy_col_index)).end('up').row
-            self.logger.log_info(
-                f"Лист '{sheet_name}': источник {src_col_letter}, цель {dst_col_letter}, последняя строка {last_row}"
-            )
-
-            def copy_range(r1, r2, dest_start):
-                """Copy cells one by one so empty values don't overwrite data."""
-                if r2 < r1:
-                    return
-                dest_end = dest_start + (r2 - r1)
-                self.logger.log_info(
-                    f"Диапазон {src_col_letter}{r1}:{src_col_letter}{r2} -> {dst_col_letter}{dest_start}:{dst_col_letter}{dest_end}"
-                )
-                for offset, row in enumerate(range(r1, r2 + 1)):
-                    src_cell = source_sheet.range(f"{src_col_letter}{row}")
-                    val = src_cell.value
-                    if val is None or (isinstance(val, str) and val.strip() == ""):
-                        continue
-                    dst_cell = target_sheet.range(f"{dst_col_letter}{dest_start + offset}")
-                    src_cell.api.Copy(dst_cell.api)
-                    self.logger.log_copy(sheet_name, dest_start + offset, col_index, val)
-
-            if header_row > 0:
-                copy_range(1, header_row, 1 if self.copy_by_row_number else header_row + 1)
-
-            start_row = header_row + 2
-            copy_range(start_row, last_row, start_row if self.copy_by_row_number else start_row + header_row)
-
-            main_wb.save()
+            subprocess.run(cmd, check=True)
         except Exception as e:
             self.logger.log_error(
-                "Ошибка при копировании через Excel", value=f"{lang_file_path}: {e}"
+                "Ошибка при копировании через VBS", value=f"{lang_file_path}: {e}"
             )
-        finally:
-            if lang_wb:
-                lang_wb.close()
-            if main_wb:
-                main_wb.close()
-            if app:
-                app.quit()

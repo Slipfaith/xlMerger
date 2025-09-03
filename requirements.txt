@@ -4,4 +4,3 @@ pandas
 requests
 pyinstaller
 pgpy
-xlwings
