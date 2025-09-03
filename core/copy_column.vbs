@@ -1,4 +1,6 @@
 ' VBScript to copy a column from one Excel file to another
+' Copies contiguous blocks of data to improve performance
+
 Set args = WScript.Arguments
 If args.Count < 9 Then
     WScript.Echo "Usage: copy_column.vbs srcFile srcSheet srcCol destFile destSheet destCol headerRow copyByRow preserveFormatting"
@@ -26,38 +28,50 @@ Set wsDest = wbDest.Sheets(destSheet)
 
 lastRow = wsSrc.Cells(wsSrc.Rows.Count, srcCol).End(-4162).Row  ' xlUp
 
-If headerRow > 0 Then
-    For r = 1 To headerRow
-        Set cellSrc = wsSrc.Cells(r, srcCol)
-        val = cellSrc.Value
-        If Not IsEmpty(val) And Trim(CStr(val)) <> "" Then
-            destRow = r
-            If copyByRow = 0 Then destRow = r + headerRow
-            If preserveFmt = 1 Then
-                cellSrc.Copy wsDest.Cells(destRow, destCol)
-            Else
-                wsDest.Cells(destRow, destCol).Value = val
-            End If
+Sub CopyBlocks(startRow, endRow)
+    Dim r, blockStart, blockEnd, val, destStart, srcRange, destCell
+    r = startRow
+    Do While r <= endRow
+        ' Find start of next non-empty block
+        Do While r <= endRow
+            val = wsSrc.Cells(r, srcCol).Value
+            If Not IsEmpty(val) And Trim(CStr(val)) <> "" Then Exit Do
+            r = r + 1
+        Loop
+        If r > endRow Then Exit Do
+        blockStart = r
+        ' Find end of the block
+        Do While r <= endRow
+            val = wsSrc.Cells(r, srcCol).Value
+            If IsEmpty(val) Or Trim(CStr(val)) = "" Then Exit Do
+            r = r + 1
+        Loop
+        blockEnd = r - 1
+
+        destStart = blockStart
+        If copyByRow = 0 Then destStart = blockStart + headerRow
+
+        Set srcRange = wsSrc.Range(wsSrc.Cells(blockStart, srcCol), wsSrc.Cells(blockEnd, srcCol))
+        Set destCell = wsDest.Cells(destStart, destCol)
+
+        If preserveFmt = 1 Then
+            srcRange.Copy destCell
+        Else
+            destCell.Resize(srcRange.Rows.Count, 1).Value = srcRange.Value
         End If
-    Next
+    Loop
+End Sub
+
+If headerRow > 0 Then
+    CopyBlocks 1, headerRow
 End If
 
-startRow = headerRow + 2
-For r = startRow To lastRow
-    Set cellSrc = wsSrc.Cells(r, srcCol)
-    val = cellSrc.Value
-    If Not IsEmpty(val) And Trim(CStr(val)) <> "" Then
-        destRow = r
-        If copyByRow = 0 Then destRow = r + headerRow
-        If preserveFmt = 1 Then
-            cellSrc.Copy wsDest.Cells(destRow, destCol)
-        Else
-            wsDest.Cells(destRow, destCol).Value = val
-        End If
-    End If
-Next
+If lastRow >= headerRow + 2 Then
+    CopyBlocks headerRow + 2, lastRow
+End If
 
 wbDest.Save
 wbSrc.Close False
 wbDest.Close True
 excel.Quit
+
