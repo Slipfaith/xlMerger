@@ -22,12 +22,15 @@ class MainPageWidget(QWidget):
         self.setup_ui()
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
+        self.apply_modern_style()
 
     def setup_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
         layout.addLayout(self.create_folder_selection_layout())
         layout.addLayout(self.create_excel_selection_layout())
-        layout.addLayout(self.create_sheet_selection_layout())
+        layout.addWidget(self.create_sheet_selection_layout(), alignment=Qt.AlignLeft)
         layout.addLayout(self.create_copy_column_layout())
         layout.addWidget(self.create_skip_first_row_checkbox())
         layout.addLayout(self.create_copy_method_selection_layout())
@@ -62,7 +65,10 @@ class MainPageWidget(QWidget):
         return layout
 
     def create_sheet_selection_layout(self):
-        layout = QVBoxLayout()
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+        layout.setSpacing(6)
+        self.sheet_label = QLabel()
         self.sheet_list = QListWidget(self)
         self.sheet_list.setSelectionMode(QListWidget.MultiSelection)
         self.sheet_list.setFixedHeight(100)
@@ -73,11 +79,11 @@ class MainPageWidget(QWidget):
         self.select_all_button.clicked.connect(self.select_all_sheets)
         button_layout.addWidget(self.deselect_all_button)
         button_layout.addWidget(self.select_all_button)
-        self.sheet_label = QLabel()
         layout.addWidget(self.sheet_label)
         layout.addWidget(self.sheet_list)
         layout.addLayout(button_layout)
-        return layout
+        container.setFixedWidth(300)
+        return container
 
     def deselect_all_sheets(self):
         for index in range(self.sheet_list.count()):
@@ -128,7 +134,6 @@ class MainPageWidget(QWidget):
 
     def create_process_button(self):
         self.process_button = QPushButton(tr("Начать"), self)
-        # Стили убраны, используем стандартный вид с границами
         self.process_button.clicked.connect(self.processTriggered)
         return self.process_button
 
@@ -154,3 +159,32 @@ class MainPageWidget(QWidget):
         self.sheet_label.setText(tr("Выберите листы:"))
         self.preview_button.setText(tr("Настроить"))
         self.process_button.setText(tr("Начать"))
+
+    def apply_modern_style(self):
+        self.setStyleSheet(
+            """
+            QLabel {
+                font-size: 14px;
+                color: #2c2c2c;
+            }
+            QLineEdit, QListWidget {
+                border: 1px solid #bdbdbd;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QPushButton {
+                background-color: #1976d2;
+                color: #ffffff;
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #1565c0;
+            }
+            QCheckBox, QRadioButton {
+                color: #2c2c2c;
+                padding: 2px;
+            }
+            """
+        )
