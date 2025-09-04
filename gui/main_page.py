@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QRadioButton,
-    QListWidget, QLineEdit
+    QListWidget, QLineEdit, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
@@ -30,7 +30,7 @@ class MainPageWidget(QWidget):
         layout.setSpacing(12)
         layout.addLayout(self.create_folder_selection_layout())
         layout.addLayout(self.create_excel_selection_layout())
-        layout.addWidget(self.create_sheet_selection_layout(), alignment=Qt.AlignLeft)
+        layout.addWidget(self.create_sheet_selection_layout())
         layout.addLayout(self.create_copy_column_layout())
         layout.addWidget(self.create_skip_first_row_checkbox())
         layout.addLayout(self.create_copy_method_selection_layout())
@@ -71,7 +71,8 @@ class MainPageWidget(QWidget):
         self.sheet_label = QLabel()
         self.sheet_list = QListWidget(self)
         self.sheet_list.setSelectionMode(QListWidget.MultiSelection)
-        self.sheet_list.setFixedHeight(100)
+        self.sheet_list.setMinimumHeight(200)
+        self.sheet_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         button_layout = QHBoxLayout()
         self.deselect_all_button = QPushButton(tr("Не выбрать все"), self)
         self.select_all_button = QPushButton(tr("Выбрать все"), self)
@@ -82,7 +83,7 @@ class MainPageWidget(QWidget):
         layout.addWidget(self.sheet_label)
         layout.addWidget(self.sheet_list)
         layout.addLayout(button_layout)
-        container.setFixedWidth(300)
+        container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         return container
 
     def deselect_all_sheets(self):
@@ -134,6 +135,7 @@ class MainPageWidget(QWidget):
 
     def create_process_button(self):
         self.process_button = QPushButton(tr("Начать"), self)
+        self.process_button.setObjectName("startButton")
         self.process_button.clicked.connect(self.processTriggered)
         return self.process_button
 
@@ -193,6 +195,12 @@ class MainPageWidget(QWidget):
             }
             QPushButton:hover {
                 background-color: #1565c0;
+            }
+            QPushButton#startButton {
+                background-color: #ff9800;
+            }
+            QPushButton#startButton:hover {
+                background-color: #fb8c00;
             }
             QCheckBox, QRadioButton {
                 color: #2c2c2c;
