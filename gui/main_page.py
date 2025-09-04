@@ -137,6 +137,17 @@ class MainPageWidget(QWidget):
         self.process_button.clicked.connect(self.processTriggered)
         return self.process_button
 
+    def update_button_heights(self):
+        """Adjust button height to fit their text."""
+        buttons = [
+            self.deselect_all_button,
+            self.select_all_button,
+            self.preview_button,
+            self.process_button,
+        ]
+        for button in buttons:
+            button.setFixedHeight(button.sizeHint().height())
+
     def clear(self):
         self.folder_entry.clear()
         self.excel_file_entry.clear()
@@ -159,6 +170,7 @@ class MainPageWidget(QWidget):
         self.sheet_label.setText(tr("Выберите листы:"))
         self.preview_button.setText(tr("Настроить"))
         self.process_button.setText(tr("Начать"))
+        self.update_button_heights()
 
     def apply_modern_style(self):
         self.setStyleSheet(
@@ -188,3 +200,4 @@ class MainPageWidget(QWidget):
             }
             """
         )
+        self.update_button_heights()
