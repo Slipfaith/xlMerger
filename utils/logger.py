@@ -15,25 +15,25 @@ class Logger:
         self.log_file = log_file
         self.entries = []
 
-    def log(self, message):
+    def log(self, message, level=logging.INFO):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         entry = f"[{timestamp}] {message}"
         self.entries.append(entry)
-        logger.error(message)  # <-- вот здесь дублируем в стандартный логгер
+        logger.log(level, message)  # Дублируем запись в стандартный логгер
 
     def log_copy(self, sheet, row, col, value):
         msg = f"COPY: {sheet} R{row}C{col} -> {repr(value)}"
-        self.log(msg)
+        self.log(msg, logging.INFO)
 
     def log_error(self, sheet, row, col, value):
         msg = f"ERROR: {sheet} R{row}C{col} -> {repr(value)}"
-        self.log(msg)
+        self.log(msg, logging.ERROR)
 
     def log_info(self, text):
-        self.log(f"INFO: {text}")
+        self.log(f"INFO: {text}", logging.INFO)
 
     def log_warning(self, text):
-        self.log(f"WARNING: {text}")
+        self.log(f"WARNING: {text}", logging.WARNING)
 
     def save(self):
         if not self.entries:
