@@ -1,11 +1,12 @@
 import os
-import traceback
+
 from PySide6.QtWidgets import QMessageBox, QListWidgetItem
 from PySide6.QtCore import Qt, QObject, Signal
 
 from core.excel_processor import ExcelProcessor
 from gui.excel_previewer import ExcelPreviewer
 from gui.excel_file_selector import ExcelFileSelector
+from utils.logger import logger
 
 class MainPageLogic(QObject):
     proceed_to_next = Signal()  # Сигнал для перехода на следующий шаг
@@ -131,8 +132,4 @@ class MainPageLogic(QObject):
         return True
 
     def log_error(self, error):
-        log_file_path = os.path.join(os.path.dirname(__file__), 'error_log.txt')
-        with open(log_file_path, 'a', encoding='utf-8') as log_file:
-            log_file.write("Ошибка: " + str(error) + "\n")
-            log_file.write(traceback.format_exc())
-            log_file.write("\n")
+        logger.exception("Ошибка: %s", error)
