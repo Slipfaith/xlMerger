@@ -6,13 +6,14 @@ from openpyxl.styles import PatternFill
 from copy import copy as copy_style
 
 from utils.logger import Logger
+from utils.markdown_logger import MarkdownLogger
 
 class ExcelProcessor:
     def __init__(
         self, main_excel_path, folder_path, copy_column, selected_sheets,
         sheet_to_header_row, sheet_to_column, file_to_column=None, folder_to_column=None,
         file_to_sheet_map=None, skip_first_row=False, copy_by_row_number=False,
-        preserve_formatting=False, logger=None
+        preserve_formatting=False, logger=None, markdown_logger=None
     ):
         self.main_excel_path = main_excel_path
         self.folder_path = folder_path
@@ -32,6 +33,7 @@ class ExcelProcessor:
         self.header_row = {}
 
         self.logger = logger or Logger()
+        self.markdown_logger = markdown_logger or MarkdownLogger()
 
     @staticmethod
     def get_sheet_names(excel_path):
@@ -116,6 +118,8 @@ class ExcelProcessor:
         self.workbook.save(output_file)
         self.logger.log_info(f"Файл успешно сохранён: {output_file}")
         self.logger.save()
+        if self.markdown_logger:
+            self.markdown_logger.save()
         self.workbook.close()
         return output_file
 
@@ -237,6 +241,16 @@ class ExcelProcessor:
                     target_cell_ref,
                     value,
                 )
+                if self.markdown_logger:
+                    self.markdown_logger.log_copy(
+                        source_path or "",
+                        source_sheet or "",
+                        source_cell_ref,
+                        self.main_excel_path,
+                        sheet_name,
+                        target_cell_ref,
+                        value,
+                    )
                 break
         else:
             fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
