@@ -102,13 +102,25 @@ class ExcelProcessor:
                     target_column_name = column_name or self.sheet_to_column.get(sheet_name)
                     if not target_column_name:
                         continue
-                    if target_column_name not in self.columns[sheet_name]:
-                        self.logger.log_error(f"Столбец '{target_column_name}' не найден на листе '{sheet_name}'", "", "", name)
-                        raise Exception(
-                            f"Столбец '{target_column_name}' не найден на листе '{sheet_name}' основного файла Excel."
-                        )
 
-                    col_index = self.columns[sheet_name].index(target_column_name) + 1
+                    if target_column_name.isalpha() and target_column_name.upper() == target_column_name:
+                        # Если указана буква столбца (A, B, AA ...), используем её как индекс,
+                        # не пытаясь искать такое имя в строке заголовка.
+                        col_index = utils.column_index_from_string(target_column_name)
+                    else:
+                        available_columns = [c for c in self.columns[sheet_name] if c]
+                        if target_column_name not in available_columns:
+                            self.logger.log_error(
+                                f"Столбец '{target_column_name}' не найден на листе '{sheet_name}' (доступны: {available_columns})",
+                                "",
+                                "",
+                                name,
+                            )
+                            raise Exception(
+                                f"Столбец '{target_column_name}' не найден на листе '{sheet_name}' основного файла Excel."
+                            )
+
+                        col_index = self.columns[sheet_name].index(target_column_name) + 1
                     if is_file_mapping:
                         file_path = os.path.join(self.folder_path, name)
                         self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {target_column_name}")

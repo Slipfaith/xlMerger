@@ -46,22 +46,28 @@ class MarkdownLogger:
         )
 
     def save(self) -> None:
-        if not self.entries:
-            return
+        """Persist the current session to disk.
+
+        Even если не было успешных копирований, создаём файл отчёта и фиксируем
+        пустую сессию, чтобы у пользователя оставался след запуска.
+        """
 
         os.makedirs(os.path.dirname(self.markdown_file) or ".", exist_ok=True)
 
         session_title = self.session_started.strftime("%Y-%m-%d %H:%M:%S")
         with open(self.markdown_file, "a", encoding="utf-8") as md_file:
             md_file.write(f"## Сессия копирования от {session_title}\n\n")
-            md_file.write("| Источник | Приёмник | Текст |\n")
-            md_file.write("| --- | --- | --- |\n")
-            for entry in self.entries:
-                source = self._format_endpoint(entry, "source")
-                target = self._format_endpoint(entry, "target")
-                text_block = self._format_text_block(entry["value"])
-                md_file.write(f"| {source} | {target} | {text_block} |\n")
-            md_file.write("\n")
+            if not self.entries:
+                md_file.write("Нет успешных копирований за эту сессию.\n\n")
+            else:
+                md_file.write("| Источник | Приёмник | Текст |\n")
+                md_file.write("| --- | --- | --- |\n")
+                for entry in self.entries:
+                    source = self._format_endpoint(entry, "source")
+                    target = self._format_endpoint(entry, "target")
+                    text_block = self._format_text_block(entry["value"])
+                    md_file.write(f"| {source} | {target} | {text_block} |\n")
+                md_file.write("\n")
 
         self.entries.clear()
         self.session_started = datetime.datetime.now()
