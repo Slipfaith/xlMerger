@@ -31,9 +31,18 @@ class Logger:
         target_cell,
         value,
     ):
+        safe_source_file = source_file or "—"
+        safe_source_sheet = source_sheet or "—"
+        safe_source_cell = source_cell or "—"
+
+        safe_target_file = target_file or "—"
+        safe_target_sheet = target_sheet or "—"
+        safe_target_cell = target_cell or "—"
+
         msg = (
-            f"COPY: {source_file} [{source_sheet}!{source_cell}] -> "
-            f"{target_file} [{target_sheet}!{target_cell}] : {repr(value)}"
+            "COPY: "
+            f"{safe_source_file} [{safe_source_sheet}!{safe_source_cell}] -> "
+            f"{safe_target_file} [{safe_target_sheet}!{safe_target_cell}] : {repr(value)}"
         )
         self.log(msg, logging.INFO)
 
