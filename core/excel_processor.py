@@ -33,7 +33,9 @@ class ExcelProcessor:
         self.header_row = {}
 
         self.logger = logger or Logger()
-        self.markdown_logger = markdown_logger or MarkdownLogger()
+        self.markdown_logger = markdown_logger or MarkdownLogger(
+            self._build_markdown_report_path()
+        )
 
     @staticmethod
     def get_sheet_names(excel_path):
@@ -60,6 +62,11 @@ class ExcelProcessor:
         if not self.copy_column:
             self.logger.log_error("Не указан столбец для копирования", "", "", "")
             raise ValueError("Укажите столбец для копирования.")
+
+    def _build_markdown_report_path(self):
+        base_dir = os.path.dirname(self.main_excel_path) or "."
+        base_name = os.path.splitext(os.path.basename(self.main_excel_path))[0]
+        return os.path.join(base_dir, f"{base_name}_copy_report.md")
 
     def copy_data(self, progress_callback=None):
         self.validate_paths_and_column()
@@ -121,6 +128,9 @@ class ExcelProcessor:
         self.logger.save()
         if self.markdown_logger:
             self.markdown_logger.save()
+            self.logger.log_info(
+                f"Markdown отчёт сохранён: {os.path.abspath(self.markdown_logger.markdown_file)}"
+            )
         self.workbook.close()
         return output_file
 
