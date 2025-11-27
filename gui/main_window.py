@@ -2,7 +2,6 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
 from PySide6.QtGui import QAction, QIcon, QFont
 from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
-from utils.updater import check_for_update
 from __init__ import __version__
 
 from .file_processor_app import FileProcessorApp
@@ -17,7 +16,6 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.init_menu()
         self.show()
-        self.check_updates(auto=True)
 
     def setup_ui(self):
         self.setWindowTitle(tr("xlMerger: объединяй и проверяй"))
@@ -143,7 +141,6 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.tab_widget.setTabText(3, tr("Объединить"))
-        self.update_action.setText(tr("Check for Updates"))
 
     def init_menu(self):
         menubar = self.menuBar()
@@ -161,11 +158,6 @@ class MainWindow(QMainWindow):
         about_action = QAction(tr("About"), self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
-
-        update_action = QAction(tr("Check for Updates"), self)
-        update_action.triggered.connect(self.check_updates)
-        help_menu.addAction(update_action)
-        self.update_action = update_action
 
         language_menu = menubar.addMenu(tr("Language"))
         lang_en = QAction("English", self)
@@ -213,6 +205,3 @@ class MainWindow(QMainWindow):
             }
         """)
         msgbox.exec()
-
-    def check_updates(self, auto: bool = False):
-        check_for_update(self, auto=auto)
