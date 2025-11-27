@@ -156,17 +156,14 @@ class ExcelProcessor:
                 lang_wb.close()
 
     def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
-        for row in range(1, lang_sheet.max_row + 1):
-            if row == header_row + 1:
-                continue  # Всегда пропускаем строку-заголовок (например, 'RU' или что там)
+        data_start_row = 2 if self.skip_first_row else 1
+
+        for row in range(data_start_row, lang_sheet.max_row + 1):
             source_value = lang_sheet.cell(row=row, column=copy_col_index).value
             if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
                 continue
-            if self.copy_by_row_number:
-                target_row = row
-            else:
-                offset = 2 if self.skip_first_row else 1
-                target_row = header_row + offset + (row - offset)
+            data_index = row - data_start_row
+            target_row = header_row + 2 + data_index
             source_cell = lang_sheet.cell(row=row, column=copy_col_index)
             self._set_cell(sheet_name, target_row, col_index, source_value, source_cell)
 
