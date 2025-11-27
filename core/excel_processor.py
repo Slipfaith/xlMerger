@@ -74,65 +74,77 @@ class ExcelProcessor:
             self.logger.log_error("Не выбраны листы", "", "", "")
             raise ValueError("Выберите хотя бы один лист.")
 
-        self.workbook = load_workbook(self.main_excel_path)
-        self.logger.log_info(f"Загружен основной Excel: {self.main_excel_path}")
+        output_file = None
+        markdown_path = None
 
-        for sheet_name in self.selected_sheets:
-            header_row_index = self.sheet_to_header_row[sheet_name]
-            self.header_row[sheet_name] = header_row_index
-            self.columns[sheet_name] = [
-                cell.value for cell in self.workbook[sheet_name][header_row_index + 1]
-            ]
-            self.logger.log_info(f"Обрабатывается лист: {sheet_name}")
+        try:
+            self.workbook = load_workbook(self.main_excel_path)
+            self.logger.log_info(f"Загружен основной Excel: {self.main_excel_path}")
 
-        is_file_mapping = bool(self.file_to_column)
-        items = self.file_to_column.items() if is_file_mapping else self.folder_to_column.items()
-        total_steps = len(self.selected_sheets) * len([c for _, c in items if c]) if items else 1
-        progress = 0
+            for sheet_name in self.selected_sheets:
+                header_row_index = self.sheet_to_header_row[sheet_name]
+                self.header_row[sheet_name] = header_row_index
+                self.columns[sheet_name] = [
+                    cell.value for cell in self.workbook[sheet_name][header_row_index + 1]
+                ]
+                self.logger.log_info(f"Обрабатывается лист: {sheet_name}")
 
-        for sheet_name in self.selected_sheets:
-            copy_col_index = utils.column_index_from_string(self.copy_column)
-            header_row = self.header_row[sheet_name]
+            is_file_mapping = bool(self.file_to_column)
+            items = self.file_to_column.items() if is_file_mapping else self.folder_to_column.items()
+            total_steps = len(self.selected_sheets) * len([c for _, c in items if c]) if items else 1
+            progress = 0
 
-            for name, column_name in items:
-                target_column_name = column_name or self.sheet_to_column.get(sheet_name)
-                if not target_column_name:
-                    continue
-                if target_column_name not in self.columns[sheet_name]:
-                    self.logger.log_error(f"Столбец '{target_column_name}' не найден на листе '{sheet_name}'", "", "", name)
-                    raise Exception(
-                        f"Столбец '{target_column_name}' не найден на листе '{sheet_name}' основного файла Excel."
-                    )
+            for sheet_name in self.selected_sheets:
+                copy_col_index = utils.column_index_from_string(self.copy_column)
+                header_row = self.header_row[sheet_name]
 
-                col_index = self.columns[sheet_name].index(target_column_name) + 1
-                if is_file_mapping:
-                    file_path = os.path.join(self.folder_path, name)
-                    self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {target_column_name}")
-                    self._copy_from_file(
-                        file_path, sheet_name, copy_col_index, header_row, col_index
-                    )
-                else:
-                    lang_folder_path = os.path.join(self.folder_path, name)
-                    self.logger.log_info(f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {target_column_name}")
-                    self._copy_from_folder(
-                        lang_folder_path, sheet_name, copy_col_index, header_row, col_index
-                    )
-                progress += 1
-                if progress_callback:
-                    progress_callback(progress, total_steps)
+                for name, column_name in items:
+                    target_column_name = column_name or self.sheet_to_column.get(sheet_name)
+                    if not target_column_name:
+                        continue
+                    if target_column_name not in self.columns[sheet_name]:
+                        self.logger.log_error(f"Столбец '{target_column_name}' не найден на листе '{sheet_name}'", "", "", name)
+                        raise Exception(
+                            f"Столбец '{target_column_name}' не найден на листе '{sheet_name}' основного файла Excel."
+                        )
 
-        base, ext = os.path.splitext(self.main_excel_path)
-        output_file = f"{base}_out{ext}"
-        self.workbook.save(output_file)
-        self.logger.log_info(f"Файл успешно сохранён: {output_file}")
-        self.logger.save()
-        if self.markdown_logger:
-            self.markdown_logger.save()
-            self.logger.log_info(
-                f"Markdown отчёт сохранён: {os.path.abspath(self.markdown_logger.markdown_file)}"
-            )
-        self.workbook.close()
-        return output_file
+                    col_index = self.columns[sheet_name].index(target_column_name) + 1
+                    if is_file_mapping:
+                        file_path = os.path.join(self.folder_path, name)
+                        self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {target_column_name}")
+                        self._copy_from_file(
+                            file_path, sheet_name, copy_col_index, header_row, col_index
+                        )
+                    else:
+                        lang_folder_path = os.path.join(self.folder_path, name)
+                        self.logger.log_info(f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {target_column_name}")
+                        self._copy_from_folder(
+                            lang_folder_path, sheet_name, copy_col_index, header_row, col_index
+                        )
+                    progress += 1
+                    if progress_callback:
+                        progress_callback(progress, total_steps)
+
+            base, ext = os.path.splitext(self.main_excel_path)
+            output_file = f"{base}_out{ext}"
+            self.workbook.save(output_file)
+            self.logger.log_info(f"Файл успешно сохранён: {output_file}")
+
+            if self.markdown_logger:
+                markdown_path = os.path.abspath(self.markdown_logger.markdown_file)
+                self.logger.log_info(f"Markdown отчёт подготовлен: {markdown_path}")
+
+            return output_file
+        finally:
+            # Даже при ошибках стараемся сохранить накопленные логи и закрыть книгу.
+            if self.markdown_logger:
+                self.markdown_logger.save()
+            self.logger.save()
+            if markdown_path:
+                self.logger.log_info(f"Markdown отчёт сохранён: {markdown_path}")
+                self.logger.save()
+            if self.workbook:
+                self.workbook.close()
 
     def _find_matching_sheet(self, lang_wb, main_sheet_name, file_path=None):
         if file_path:
