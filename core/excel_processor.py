@@ -84,28 +84,29 @@ class ExcelProcessor:
         progress = 0
 
         for sheet_name in self.selected_sheets:
-            copy_col_index = utils.column_index_from_string(self.sheet_to_column[sheet_name])
+            copy_col_index = utils.column_index_from_string(self.copy_column)
             header_row = self.header_row[sheet_name]
 
             for name, column_name in items:
-                if not column_name:
+                target_column_name = column_name or self.sheet_to_column.get(sheet_name)
+                if not target_column_name:
                     continue
-                if column_name not in self.columns[sheet_name]:
-                    self.logger.log_error(f"Столбец '{column_name}' не найден на листе '{sheet_name}'", "", "", name)
+                if target_column_name not in self.columns[sheet_name]:
+                    self.logger.log_error(f"Столбец '{target_column_name}' не найден на листе '{sheet_name}'", "", "", name)
                     raise Exception(
-                        f"Столбец '{column_name}' не найден на листе '{sheet_name}' основного файла Excel."
+                        f"Столбец '{target_column_name}' не найден на листе '{sheet_name}' основного файла Excel."
                     )
 
-                col_index = self.columns[sheet_name].index(column_name) + 1
+                col_index = self.columns[sheet_name].index(target_column_name) + 1
                 if is_file_mapping:
                     file_path = os.path.join(self.folder_path, name)
-                    self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {column_name}")
+                    self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {target_column_name}")
                     self._copy_from_file(
                         file_path, sheet_name, copy_col_index, header_row, col_index
                     )
                 else:
                     lang_folder_path = os.path.join(self.folder_path, name)
-                    self.logger.log_info(f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {column_name}")
+                    self.logger.log_info(f"Копирование из папки: {lang_folder_path}, лист: {sheet_name}, столбец: {target_column_name}")
                     self._copy_from_folder(
                         lang_folder_path, sheet_name, copy_col_index, header_row, col_index
                     )
