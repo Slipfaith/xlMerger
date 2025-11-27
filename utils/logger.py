@@ -21,8 +21,20 @@ class Logger:
         self.entries.append(entry)
         logger.log(level, message)  # Дублируем запись в стандартный логгер
 
-    def log_copy(self, sheet, row, col, value):
-        msg = f"COPY: {sheet} R{row}C{col} -> {repr(value)}"
+    def log_copy(
+        self,
+        source_file,
+        source_sheet,
+        source_cell,
+        target_file,
+        target_sheet,
+        target_cell,
+        value,
+    ):
+        msg = (
+            f"COPY: {source_file} [{source_sheet}!{source_cell}] -> "
+            f"{target_file} [{target_sheet}!{target_cell}] : {repr(value)}"
+        )
         self.log(msg, logging.INFO)
 
     def log_error(self, sheet, row, col, value):

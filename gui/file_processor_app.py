@@ -19,6 +19,7 @@ from gui.sheet_mapping_dialog import SheetMappingDialog
 from core.main_page_logic import MainPageLogic
 from core.excel_processor import ExcelProcessor
 from gui.pages.header_row_page import HeaderRowPage
+from openpyxl.utils import column_index_from_string
 
 def short_name_no_ext(name, n=5):
     base, ext = os.path.splitext(name)
@@ -75,7 +76,7 @@ class FileProcessorApp(QWidget):
     def process_files(self):
         self.selected_files = self.main_page_logic.selected_files
         self.folder_path = self.main_page_logic.folder_path
-        self.copy_column = self.main_page_logic.copy_column.strip()
+        self.copy_column = self.main_page_logic.copy_column.strip().upper()
         self.selected_sheets = self.main_page_logic.get_selected_sheets()
         self.excel_file_path = self.main_page_logic.excel_file_path
         self.skip_first_row = self.page_main.skip_first_row_checkbox.isChecked()
@@ -127,8 +128,26 @@ class FileProcessorApp(QWidget):
         self.stack.setCurrentWidget(self.page_sheet_column)
 
     def handle_sheet_column_selected(self, sheet_to_column):
-        self.sheet_to_column = sheet_to_column
+        try:
+            self.sheet_to_column = {
+                sheet: self._validate_column_name(column)
+                for sheet, column in sheet_to_column.items()
+            }
+        except ValueError as e:
+            QMessageBox.critical(self, tr("Error"), str(e))
+            return
         self.go_to_match_page()
+
+    @staticmethod
+    def _validate_column_name(column: str) -> str:
+        column = (column or "").strip().upper()
+        if not column:
+            raise ValueError(tr("Укажи столбец для копирования."))
+        try:
+            column_index_from_string(column)
+        except ValueError:
+            raise ValueError(tr("Столбец '{column}' должен быть указан буквами (например, A или AB).").format(column=column))
+        return column
 
     # === Match Page (file/papka -> column mapping) ===
     def go_to_match_page(self):

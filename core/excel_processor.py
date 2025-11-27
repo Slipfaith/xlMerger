@@ -142,7 +142,14 @@ class ExcelProcessor:
             lang_wb = load_workbook(file_path)
             target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
             lang_sheet = lang_wb[target_sheet_name]
-            self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
+            self._copy_from_sheet(
+                file_path,
+                lang_sheet,
+                main_sheet_name,
+                copy_col_index,
+                header_row,
+                col_index,
+            )
             lang_wb.close()
 
     def _copy_from_folder(self, lang_folder_path, main_sheet_name, copy_col_index, header_row, col_index):
@@ -152,10 +159,17 @@ class ExcelProcessor:
                 lang_wb = load_workbook(file_path)
                 target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
                 lang_sheet = lang_wb[target_sheet_name]
-                self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
+                self._copy_from_sheet(
+                    file_path,
+                    lang_sheet,
+                    main_sheet_name,
+                    copy_col_index,
+                    header_row,
+                    col_index,
+                )
                 lang_wb.close()
 
-    def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
+    def _copy_from_sheet(self, source_path, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
         for row in range(1, lang_sheet.max_row + 1):
             if row == header_row + 1:
                 continue  # Всегда пропускаем строку-заголовок (например, 'RU' или что там)
@@ -168,9 +182,30 @@ class ExcelProcessor:
                 offset = 2 if self.skip_first_row else 1
                 target_row = header_row + offset + (row - offset)
             source_cell = lang_sheet.cell(row=row, column=copy_col_index)
-            self._set_cell(sheet_name, target_row, col_index, source_value, source_cell)
+            self._set_cell(
+                sheet_name,
+                target_row,
+                col_index,
+                source_value,
+                source_cell,
+                source_path,
+                lang_sheet.title,
+                row,
+                copy_col_index,
+            )
 
-    def _set_cell(self, sheet_name, target_row, col_index, value, source_cell=None):
+    def _set_cell(
+        self,
+        sheet_name,
+        target_row,
+        col_index,
+        value,
+        source_cell=None,
+        source_path=None,
+        source_sheet=None,
+        source_row=None,
+        source_col=None,
+    ):
         target_cell = self.workbook[sheet_name].cell(row=target_row, column=col_index)
         def compute_hash(text):
             if text is None:
@@ -189,7 +224,19 @@ class ExcelProcessor:
                 target_cell.alignment = copy_style(source_cell.alignment)
             if value == target_cell.value and compute_hash(target_cell.value) == source_hash:
                 # Успешно скопировано — логируем
-                self.logger.log_copy(sheet_name, target_row, col_index, value)
+                source_cell_ref = ""
+                if source_row and source_col:
+                    source_cell_ref = f"{utils.get_column_letter(source_col)}{source_row}"
+                target_cell_ref = f"{utils.get_column_letter(col_index)}{target_row}"
+                self.logger.log_copy(
+                    source_path or "",
+                    source_sheet or "",
+                    source_cell_ref,
+                    self.main_excel_path,
+                    sheet_name,
+                    target_cell_ref,
+                    value,
+                )
                 break
         else:
             fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
