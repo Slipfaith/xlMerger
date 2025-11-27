@@ -157,8 +157,8 @@ class ExcelProcessor:
 
     def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
         for row in range(1, lang_sheet.max_row + 1):
-            if row == header_row + 1:
-                continue  # Всегда пропускаем строку-заголовок (например, 'RU' или что там)
+            if self.skip_first_row and row == header_row + 1:
+                continue  # Пропускаем строку-заголовок, только если выбрано в настройках
             source_value = lang_sheet.cell(row=row, column=copy_col_index).value
             if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
                 continue
