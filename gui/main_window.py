@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.tab_widget.setTabText(3, tr("Объединить"))
-        self.builder_action.setIcon(self._get_settings_icon())
+        self.builder_action.setText(tr("xlCraft"))
         self.builder_action.setToolTip(tr("Конструктор Excel"))
         self.back_button.setText(self._get_back_button_text())
 
@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
         self.lang_en_action = lang_en
         self.lang_ru_action = lang_ru
 
-        self.builder_action = QAction(self._get_settings_icon(), "⚙", self)
+        self.builder_action = QAction(tr("xlCraft"), self)
         self.builder_action.triggered.connect(self.show_builder_page)
         menubar.addAction(self.builder_action)
 
