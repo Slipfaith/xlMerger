@@ -1,4 +1,13 @@
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QMessageBox,
+    QTabWidget,
+    QStackedWidget,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+)
 from PySide6.QtGui import QAction, QIcon, QFont, QPixmap, QPainter
 from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
@@ -20,7 +29,7 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         self.setWindowTitle(tr("xlMerger: объединяй и проверяй"))
-        self.setWindowIcon(QIcon(r"C:\Users\yanismik\Desktop\PythonProject1\xlM_2.0\xlM2.0.ico"))
+        self.setWindowIcon(QIcon(r"C:\\Users\\yanismik\\Desktop\\PythonProject1\\xlM_2.0\\xlM2.0.ico"))
         self.setMinimumSize(650, 450)
 
         self.tab_widget = QTabWidget()
@@ -37,13 +46,19 @@ class MainWindow(QMainWindow):
         self.merge_tab_widget = MergeTab()
         self.tab_widget.addTab(self.merge_tab_widget, tr("Объединить"))
 
-        self.excel_builder_widget = ExcelBuilderTab()
-        settings_icon = self._get_settings_icon()
-        self.tab_widget.addTab(self.excel_builder_widget, self._get_builder_tab_text())
-        self.tab_widget.setTabIcon(4, settings_icon)
-        self.tab_widget.setTabToolTip(4, tr("Конструктор Excel"))
+        self.main_screen = QWidget()
+        main_layout = QVBoxLayout(self.main_screen)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.tab_widget)
 
-        self.setCentralWidget(self.tab_widget)
+        self.excel_builder_widget = ExcelBuilderTab()
+        self.builder_container = self._create_builder_page()
+
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.addWidget(self.main_screen)
+        self.stacked_widget.addWidget(self.builder_container)
+
+        self.setCentralWidget(self.stacked_widget)
         self.apply_modern_style()
 
     def apply_modern_style(self):
@@ -148,9 +163,10 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.tab_widget.setTabText(3, tr("Объединить"))
-        self.tab_widget.setTabText(4, self._get_builder_tab_text())
-        self.tab_widget.setTabIcon(4, self._get_settings_icon())
-        self.tab_widget.setTabToolTip(4, tr("Конструктор Excel"))
+        self.builder_action.setText(self._get_builder_tab_text())
+        self.builder_action.setIcon(self._get_settings_icon())
+        self.builder_action.setToolTip(tr("Конструктор Excel"))
+        self.back_button.setText(self._get_back_button_text())
 
     def init_menu(self):
         menubar = self.menuBar()
@@ -180,9 +196,34 @@ class MainWindow(QMainWindow):
         self.lang_en_action = lang_en
         self.lang_ru_action = lang_ru
 
+        self.builder_action = QAction(self._get_settings_icon(), self._get_builder_tab_text(), self)
+        self.builder_action.triggered.connect(self.show_builder_page)
+        menubar.addAction(self.builder_action)
+
         self.about_action = about_action
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
+
+    def _create_builder_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        header = QHBoxLayout()
+        self.back_button = QPushButton(self._get_back_button_text())
+        self.back_button.clicked.connect(self.show_main_screen)
+        header.addWidget(self.back_button)
+        header.addStretch()
+
+        layout.addLayout(header)
+        layout.addWidget(self.excel_builder_widget)
+        return page
+
+    def show_main_screen(self):
+        self.stacked_widget.setCurrentWidget(self.main_screen)
+
+    def show_builder_page(self):
+        self.stacked_widget.setCurrentWidget(self.builder_container)
 
     def _get_settings_icon(self) -> QIcon:
         icon = QIcon.fromTheme("settings")
@@ -204,6 +245,9 @@ class MainWindow(QMainWindow):
 
     def _get_builder_tab_text(self) -> str:
         return f"⚙ {tr('Конструктор Excel')}"
+
+    def _get_back_button_text(self) -> str:
+        return f"← {tr('Назад')}"
 
     def show_about(self):
         info_text = (
