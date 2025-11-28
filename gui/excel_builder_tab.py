@@ -129,11 +129,11 @@ class ExcelBuilderTab(QWidget):
         preview_controls.addWidget(QLabel(tr("Высота превью")))
         self.preview_height_slider = QSlider(Qt.Horizontal)
         self.preview_height_slider.setRange(120, 800)
-        self.preview_height_slider.setValue(320)
+        self.preview_height_slider.setValue(120)
         self.preview_height_slider.setSingleStep(10)
         self.preview_height_slider.valueChanged.connect(self._update_preview_height)
         preview_controls.addWidget(self.preview_height_slider, 1)
-        self.preview_height_label = QLabel("320 px")
+        self.preview_height_label = QLabel("120 px")
         preview_controls.addWidget(self.preview_height_label)
 
         self.preview_toggle = QToolButton()
