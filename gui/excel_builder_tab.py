@@ -301,12 +301,17 @@ class ExcelBuilderTab(QWidget):
         self.scope_combo.addItem(tr("Все файлы"), userData="all")
         for f in self.manager.files:
             name = self._display_name(f["path"])
-            item = QListWidgetItem(self._short_name(name))
+            item = QListWidgetItem(name)
             item.setToolTip(f["path"])
             self.file_list.addItem(item)
 
-            self.preview_file_combo.addItem(self._short_name(name), userData=f)
-            self.scope_combo.addItem(self._short_name(name), userData=f["path"])
+            self.preview_file_combo.addItem(name, userData=f)
+            index = self.preview_file_combo.count() - 1
+            self.preview_file_combo.setItemData(index, name, role=Qt.ToolTipRole)
+
+            self.scope_combo.addItem(name, userData=f["path"])
+            scope_index = self.scope_combo.count() - 1
+            self.scope_combo.setItemData(scope_index, name, role=Qt.ToolTipRole)
         self.preview_file_combo.blockSignals(False)
         self.scope_combo.blockSignals(False)
         self._on_preview_file_changed()
@@ -466,7 +471,7 @@ class ExcelBuilderTab(QWidget):
         self._update_list_rows(self.operations_list, self.operations_list.count(), max_rows=5)
 
     def _describe_operation(self, op: Dict) -> str:
-        scope = tr("все") if op.get("scope") == "all" else self._short_name(self._display_name(op.get("scope", "")))
+        scope = tr("все") if op.get("scope") == "all" else self._display_name(op.get("scope", ""))
         if op["type"] == "rename_header":
             return f"[{scope}] {op['sheet']}: {op['identifier']} -> {op['new']}"
         if op["type"] == "fill_cell":
@@ -518,12 +523,7 @@ class ExcelBuilderTab(QWidget):
         QMessageBox.information(self, tr("Готово"), tr("Обработка завершена"))
 
     def _display_name(self, path: str) -> str:
-        base = os.path.basename(path)
-        name, _ = os.path.splitext(base)
-        return name
-
-    def _short_name(self, path: str, n: int = 5) -> str:
-        return path if len(path) <= 2 * n else f"{path[:n]}...{path[-n:]}"
+        return os.path.basename(path)
 
     def _log_line(self, text: str):
         logger.info(text)
