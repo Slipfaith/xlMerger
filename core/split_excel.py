@@ -1,8 +1,8 @@
-from openpyxl import load_workbook, Workbook
-from copy import copy
+from openpyxl import load_workbook
 import os
 import subprocess
 from typing import Callable, List, Dict, Tuple
+import xlsxwriter
 from openpyxl.utils import get_column_letter
 
 
@@ -15,24 +15,87 @@ def _is_lang_column(name: str) -> bool:
     return name.isalpha()
 
 
-def _copy_cell(src, dst):
-    """Copy value and style from ``src`` cell to ``dst`` cell."""
-    dst.value = src.value
-    if src.has_style:
-        dst.font = copy(src.font)
-        dst.border = copy(src.border)
-        dst.fill = copy(src.fill)
-        dst.number_format = copy(src.number_format)
-        dst.protection = copy(src.protection)
-        dst.alignment = copy(src.alignment)
+def _normalize_color(color) -> str | None:
+    if not color:
+        return None
+    rgb = getattr(color, "rgb", None)
+    if not rgb:
+        return None
+    if len(rgb) == 8:
+        return rgb[-6:]
+    if len(rgb) == 6:
+        return rgb
+    return None
 
 
-def _copy_column_width(src_sheet, dst_sheet, src_idx: int, dst_idx: int):
-    src_letter = get_column_letter(src_idx)
-    dst_letter = get_column_letter(dst_idx)
-    width = src_sheet.column_dimensions[src_letter].width
-    if width is not None:
-        dst_sheet.column_dimensions[dst_letter].width = width
+def _get_xlsxwriter_format(workbook, cell, cache):
+    if cell is None or not cell.has_style:
+        return None
+
+    font = cell.font
+    fill = cell.fill
+    alignment = cell.alignment
+
+    font_color = _normalize_color(font.color)
+    fill_color = _normalize_color(fill.fgColor) if getattr(fill, "fill_type", None) == "solid" else None
+
+    key = (
+        bool(font.bold),
+        bool(font.italic),
+        font.underline,
+        font.name,
+        font.sz,
+        font_color,
+        fill_color,
+        cell.number_format,
+        alignment.horizontal,
+        alignment.vertical,
+        alignment.wrap_text,
+    )
+
+    if key in cache:
+        return cache[key]
+
+    fmt_args: Dict[str, object] = {}
+    if font.bold:
+        fmt_args["bold"] = True
+    if font.italic:
+        fmt_args["italic"] = True
+    if font.underline:
+        fmt_args["underline"] = font.underline if isinstance(font.underline, str) else True
+    if font.name:
+        fmt_args["font_name"] = font.name
+    if font.sz:
+        fmt_args["font_size"] = font.sz
+    if font_color:
+        fmt_args["font_color"] = font_color
+    if fill_color:
+        fmt_args["bg_color"] = fill_color
+        fmt_args["pattern"] = 1
+    if cell.number_format:
+        fmt_args["num_format"] = cell.number_format
+    if alignment.horizontal:
+        fmt_args["align"] = alignment.horizontal
+    if alignment.vertical:
+        fmt_args["valign"] = alignment.vertical
+    if alignment.wrap_text:
+        fmt_args["text_wrap"] = True
+
+    fmt = workbook.add_format(fmt_args)
+    cache[key] = fmt
+    return fmt
+
+
+def _write_rows(ws, rows: List[List[Tuple[object, object]]], widths: List[float | None], workbook) -> None:
+    fmt_cache: Dict[Tuple, object] = {}
+    for idx, width in enumerate(widths):
+        if width is not None:
+            ws.set_column(idx, idx, width)
+
+    for r_idx, row in enumerate(rows):
+        for c_idx, (value, cell) in enumerate(row):
+            fmt = _get_xlsxwriter_format(workbook, cell, fmt_cache)
+            ws.write(r_idx, c_idx, value, fmt)
 
 
 def _find_last_data_row(sheet, columns: List[int]) -> int:
@@ -133,40 +196,44 @@ def split_excel_by_languages(
                 extra_headers.append(col_names[idx])
 
     created: List[str] = []
-        for i, (target_lang, idx) in enumerate(targets, start=1):
-            new_wb = Workbook()
-            ws_new = new_wb.active
-            ws_new.title = sheet_name
-            col_pos = 1
-            for header in extra_headers:
-                ex_idx = header_map[header]
-                _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
-                ws_new.cell(row=1, column=col_pos).value = header
-                _copy_column_width(sheet, ws_new, ex_idx, col_pos)
-                col_pos += 1
-            _copy_cell(sheet.cell(row=1, column=source_idx), ws_new.cell(row=1, column=col_pos))
-            ws_new.cell(row=1, column=col_pos).value = source_header
-            _copy_column_width(sheet, ws_new, source_idx, col_pos)
-            col_pos += 1
-            _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
-            ws_new.cell(row=1, column=col_pos).value = target_lang
-            _copy_column_width(sheet, ws_new, idx, col_pos)
-            col_pos += 1
+    for i, (target_lang, idx) in enumerate(targets, start=1):
+        rows: List[List[Tuple[object, object]]] = []
+        widths: List[float | None] = []
+
+        headers: List[Tuple[object, object]] = []
+        for header in extra_headers:
+            ex_idx = header_map[header]
+            cell = sheet.cell(row=1, column=ex_idx)
+            headers.append((header, cell))
+            widths.append(sheet.column_dimensions[get_column_letter(ex_idx)].width)
+        cell = sheet.cell(row=1, column=source_idx)
+        headers.append((source_header, cell))
+        widths.append(sheet.column_dimensions[get_column_letter(source_idx)].width)
+        cell = sheet.cell(row=1, column=idx)
+        headers.append((target_lang, cell))
+        widths.append(sheet.column_dimensions[get_column_letter(idx)].width)
+        rows.append(headers)
+
         last_row = _find_last_data_row(sheet, [*extra_idx, source_idx, idx])
         for row in range(2, last_row + 1):
-            col_pos = 1
+            row_data: List[Tuple[object, object]] = []
             for ex_idx in extra_idx:
-                _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
-                col_pos += 1
-            _copy_cell(sheet.cell(row=row, column=source_idx), ws_new.cell(row=row, column=col_pos))
-            col_pos += 1
-            _copy_cell(sheet.cell(row=row, column=idx), ws_new.cell(row=row, column=col_pos))
-            col_pos += 1
+                src_cell = sheet.cell(row=row, column=ex_idx)
+                row_data.append((src_cell.value, src_cell))
+            src_cell = sheet.cell(row=row, column=source_idx)
+            row_data.append((src_cell.value, src_cell))
+            tgt_cell = sheet.cell(row=row, column=idx)
+            row_data.append((tgt_cell.value, tgt_cell))
+            rows.append(row_data)
+
         base, ext = os.path.splitext(os.path.basename(excel_path))
         out_name = f"{base}_{source_header}-{target_lang}{ext}"
         out_path = os.path.join(output_dir, out_name)
-        new_wb.save(out_path)
-        new_wb.close()
+
+        wb_out = xlsxwriter.Workbook(out_path)
+        ws_new = wb_out.add_worksheet(sheet_name)
+        _write_rows(ws_new, rows, widths, wb_out)
+        wb_out.close()
         _run_excelltru(out_path)
         created.append(out_path)
         if progress_callback:
@@ -188,15 +255,9 @@ def split_excel_multiple_sheets(
     if output_dir is None:
         output_dir = os.path.dirname(excel_path)
 
-    workbooks: Dict[str, Workbook] = {}
+    workbooks: Dict[str, Dict[str, Dict[str, object]]] = {}
     created: List[str] = []
     source_names: set[str] = set()
-
-    def get_wb(target: str) -> Workbook:
-        if target not in workbooks:
-            workbooks[target] = Workbook()
-            workbooks[target].remove(workbooks[target].active)
-        return workbooks[target]
 
     for sheet_name, (src, targets, extras) in sheet_configs.items():
         sheet = wb[sheet_name]
@@ -254,49 +315,51 @@ def split_excel_multiple_sheets(
                     extra_headers.append(col_names[i])
 
         for tgt_name, idx in col_targets:
-            wb_out = get_wb(tgt_name)
-            if sheet_name in wb_out.sheetnames:
-                ws_new = wb_out[sheet_name]
-            else:
-                ws_new = wb_out.create_sheet(title=sheet_name)
+            tgt_workbook = workbooks.setdefault(tgt_name, {})
+            sheet_info = tgt_workbook.setdefault(sheet_name, {"rows": [], "widths": []})
 
-            if ws_new.max_row == 1 and ws_new.max_column == 1 and ws_new.cell(row=1, column=1).value is None:
-                col_pos = 1
+            if not sheet_info["rows"]:
+                widths: List[float | None] = []
+                headers: List[Tuple[object, object]] = []
                 for header in extra_headers:
                     ex_idx = header_map[header]
-                    _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
-                    ws_new.cell(row=1, column=col_pos).value = header
-                    _copy_column_width(sheet, ws_new, ex_idx, col_pos)
-                    col_pos += 1
-                _copy_cell(sheet.cell(row=1, column=src_idx), ws_new.cell(row=1, column=col_pos))
-                ws_new.cell(row=1, column=col_pos).value = src_name
-                _copy_column_width(sheet, ws_new, src_idx, col_pos)
-                col_pos += 1
-                _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
-                ws_new.cell(row=1, column=col_pos).value = tgt_name
-                _copy_column_width(sheet, ws_new, idx, col_pos)
-                col_pos += 1
+                    cell = sheet.cell(row=1, column=ex_idx)
+                    headers.append((header, cell))
+                    widths.append(sheet.column_dimensions[get_column_letter(ex_idx)].width)
+                cell = sheet.cell(row=1, column=src_idx)
+                headers.append((src_name, cell))
+                widths.append(sheet.column_dimensions[get_column_letter(src_idx)].width)
+                cell = sheet.cell(row=1, column=idx)
+                headers.append((tgt_name, cell))
+                widths.append(sheet.column_dimensions[get_column_letter(idx)].width)
+                sheet_info["rows"].append(headers)
+                sheet_info["widths"] = widths
 
             last_row = _find_last_data_row(sheet, [*extra_idx, src_idx, idx])
             for row in range(2, last_row + 1):
-                col_pos = 1
+                row_data: List[Tuple[object, object]] = []
                 for ex_idx in extra_idx:
-                    _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
-                    col_pos += 1
-                _copy_cell(sheet.cell(row=row, column=src_idx), ws_new.cell(row=row, column=col_pos))
-                col_pos += 1
-                _copy_cell(sheet.cell(row=row, column=idx), ws_new.cell(row=row, column=col_pos))
-                col_pos += 1
+                    src_cell = sheet.cell(row=row, column=ex_idx)
+                    row_data.append((src_cell.value, src_cell))
+                src_cell = sheet.cell(row=row, column=src_idx)
+                row_data.append((src_cell.value, src_cell))
+                tgt_cell = sheet.cell(row=row, column=idx)
+                row_data.append((tgt_cell.value, tgt_cell))
+                sheet_info["rows"].append(row_data)
 
     base, ext = os.path.splitext(os.path.basename(excel_path))
     sources = source_names
 
-    for i, (tgt, new_wb) in enumerate(workbooks.items(), start=1):
-        src_part = next(iter(sources)) if len(sources) == 1 else "src"
+    src_part = next(iter(sources)) if len(sources) == 1 else "src"
+
+    for i, (tgt, sheets) in enumerate(workbooks.items(), start=1):
         out_name = f"{base}_{src_part}-{tgt}{ext}"
         out_path = os.path.join(output_dir, out_name)
-        new_wb.save(out_path)
-        new_wb.close()
+        wb_out = xlsxwriter.Workbook(out_path)
+        for sheet_name, info in sheets.items():
+            ws_new = wb_out.add_worksheet(sheet_name)
+            _write_rows(ws_new, info["rows"], info["widths"], wb_out)
+        wb_out.close()
         _run_excelltru(out_path)
         created.append(out_path)
         if progress_callback:
