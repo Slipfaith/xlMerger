@@ -1,5 +1,4 @@
 import os
-import string
 from typing import Dict, List
 
 import pandas as pd
@@ -24,30 +23,42 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QTextEdit,
     QProgressDialog,
+    QScrollArea,
 )
 
 from utils.i18n import tr
 from utils.logger import logger
 from core.drag_drop import DragDropLineEdit
+from excel_builder import ExcelBuilderExecutor, ExcelFilesManager
 
 
 class ExcelBuilderTab(QWidget):
     def __init__(self):
         super().__init__()
-        self.files: List[Dict[str, str]] = []
+        self.manager = ExcelFilesManager()
+        self.executor = ExcelBuilderExecutor(log_callback=self._log_line)
         self.operations: List[Dict] = []
-        self.base_folder: str | None = None
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        layout.addWidget(self._create_loader_box())
-        layout.addWidget(self._create_preview_box())
-        layout.addWidget(self._create_operations_box())
-        layout.addWidget(self._create_actions_box())
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_widget = QWidget()
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        content_layout = QVBoxLayout(scroll_widget)
+        content_layout.setContentsMargins(20, 20, 20, 20)
+        content_layout.setSpacing(15)
+
+        content_layout.addWidget(self._create_loader_box())
+        content_layout.addWidget(self._create_preview_box())
+        content_layout.addWidget(self._create_operations_box())
+        content_layout.addWidget(self._create_actions_box())
+        content_layout.addStretch()
 
     # region UI builders
     def _create_loader_box(self):
@@ -226,39 +237,12 @@ class ExcelBuilderTab(QWidget):
             self.add_folder(folder)
 
     def add_files(self, files: List[str]):
-        if not files:
-            return
-        if self.base_folder is None:
-            self.base_folder = os.path.dirname(files[0])
-        for path in files:
-            if not os.path.isfile(path) or not path.lower().endswith((".xlsx", ".xls")):
-                continue
-            if any(f["path"] == path for f in self.files):
-                continue
-            rel = self._relative_path(path)
-            self.files.append({"path": path, "rel": rel})
+        self.manager.add_files(files)
         self._refresh_file_views()
 
     def add_folder(self, folder: str):
-        if not os.path.isdir(folder):
-            return
-        if self.base_folder is None:
-            self.base_folder = folder
-        for root, _, filenames in os.walk(folder):
-            for name in filenames:
-                if not name.lower().endswith((".xlsx", ".xls")):
-                    continue
-                path = os.path.join(root, name)
-                if any(f["path"] == path for f in self.files):
-                    continue
-                rel = os.path.relpath(path, folder)
-                self.files.append({"path": path, "rel": rel})
+        self.manager.add_folder(folder)
         self._refresh_file_views()
-
-    def _relative_path(self, path: str) -> str:
-        if self.base_folder and os.path.commonpath([self.base_folder, path]) == self.base_folder:
-            return os.path.relpath(path, self.base_folder)
-        return os.path.basename(path)
 
     def _refresh_file_views(self):
         self.file_list.clear()
@@ -268,7 +252,7 @@ class ExcelBuilderTab(QWidget):
         # keep "all" entry
         self.scope_combo.clear()
         self.scope_combo.addItem(tr("Все файлы"), userData="all")
-        for f in self.files:
+        for f in self.manager.files:
             item = QListWidgetItem(self._short_name(os.path.basename(f["path"])))
             item.setToolTip(f["path"])
             self.file_list.addItem(item)
@@ -281,11 +265,7 @@ class ExcelBuilderTab(QWidget):
 
     def remove_selected_files(self):
         rows = sorted({index.row() for index in self.file_list.selectedIndexes()}, reverse=True)
-        for row in rows:
-            if 0 <= row < len(self.files):
-                del self.files[row]
-        if not self.files:
-            self.base_folder = None
+        self.manager.remove_indices(rows)
         self._refresh_file_views()
 
     # endregion
@@ -316,6 +296,9 @@ class ExcelBuilderTab(QWidget):
             return
         df = sheets[sheet_name].head(30)
         self._populate_table(df)
+
+    def _read_sheets(self, path: str, preview: bool = False) -> Dict[str, pd.DataFrame]:
+        return self.executor.read_sheets(path, preview=preview)
 
     def _populate_table(self, df: pd.DataFrame):
         self.preview_table.clear()
@@ -435,7 +418,7 @@ class ExcelBuilderTab(QWidget):
 
     # region execution
     def execute(self):
-        if not self.files:
+        if not self.manager.files:
             QMessageBox.warning(self, tr("Ошибка"), tr("Добавьте файлы"))
             return
         target_ops = self.operations
@@ -447,164 +430,27 @@ class ExcelBuilderTab(QWidget):
             )
             if reply != QMessageBox.Yes:
                 return
-        progress = QProgressDialog(tr("Обработка..."), tr("Отмена"), 0, len(self.files), self)
+        progress = QProgressDialog(tr("Обработка..."), tr("Отмена"), 0, len(self.manager.files), self)
         progress.setWindowModality(Qt.ApplicationModal)
         progress.show()
         self.log_output.clear()
 
-        output_root = self._output_root()
+        output_root = self.manager.build_output_root()
         os.makedirs(output_root, exist_ok=True)
         logger.info(f"Output root: {output_root}")
-        for idx, f in enumerate(self.files, start=1):
+        for idx, f in enumerate(self.manager.files, start=1):
             progress.setValue(idx - 1)
             progress.setLabelText(os.path.basename(f["path"]))
             QApplication.processEvents()
             try:
-                self._process_file(f, output_root, target_ops)
+                self.executor.process_file(f, output_root, target_ops)
                 self._log_line(f"✓ {f['path']}")
             except Exception as exc:  # noqa: BLE001
                 self._log_line(f"✗ {f['path']}: {exc}")
             if progress.wasCanceled():
                 break
-        progress.setValue(len(self.files))
+        progress.setValue(len(self.manager.files))
         QMessageBox.information(self, tr("Готово"), tr("Обработка завершена"))
-
-    def _output_root(self) -> str:
-        if self.base_folder:
-            parent = os.path.dirname(self.base_folder)
-            name = os.path.basename(self.base_folder)
-            return os.path.join(parent, f"{name}_upd")
-        first_file_dir = os.path.dirname(self.files[0]["path"])
-        first_name = os.path.splitext(os.path.basename(self.files[0]["path"]))[0]
-        return os.path.join(first_file_dir, f"{first_name}_upd")
-
-    def _process_file(self, file_info: Dict[str, str], output_root: str, operations: List[Dict]):
-        sheets = self._read_sheets(file_info["path"])
-        sheets = self._apply_operations(sheets, operations, file_info["path"])
-        rel_path = file_info["rel"]
-        dest_path = os.path.join(output_root, rel_path)
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        if dest_path.lower().endswith(".xls"):
-            dest_path = dest_path + "x"  # normalize to xlsx for writer
-        with pd.ExcelWriter(dest_path, engine="xlsxwriter") as writer:
-            for name, df in sheets.items():
-                df.to_excel(writer, sheet_name=name, index=False, header=False)
-
-    def _apply_operations(self, sheets: Dict[str, pd.DataFrame], operations: List[Dict], file_path: str):
-        # Apply sheet renames first so other operations use updated names
-        rename_ops = [op for op in operations if op["type"] == "rename_sheet" and self._op_matches(op, file_path)]
-        if rename_ops:
-            sheets = self._rename_sheets(sheets, rename_ops)
-
-        for op in operations:
-            if op["type"] == "rename_sheet":
-                continue
-            if not self._op_matches(op, file_path):
-                continue
-            sheet_name = op.get("sheet")
-            if not sheet_name or sheet_name not in sheets:
-                self._log_line(f"Пропуск операции {op['type']} для файла {file_path}: лист '{sheet_name}' не найден")
-                continue
-            df = sheets[sheet_name]
-            if op["type"] == "rename_header":
-                df = self._rename_header(df, op)
-            elif op["type"] == "fill_cell":
-                df = self._fill_cell(df, op)
-            elif op["type"] == "clear_column":
-                df = self._clear_column(df, op)
-            sheets[sheet_name] = df
-        return sheets
-
-    def _rename_sheets(self, sheets: Dict[str, pd.DataFrame], operations: List[Dict]):
-        result: Dict[str, pd.DataFrame] = {}
-        for name, df in sheets.items():
-            new_name = name
-            for op in operations:
-                if op["old"] == name:
-                    candidate = op["new"]
-                    counter = 2
-                    while candidate in result or candidate in sheets:
-                        candidate = f"{op['new']}_{counter}"
-                        counter += 1
-                    new_name = candidate
-                    break
-            result[new_name] = df
-        return result
-
-    def _rename_header(self, df: pd.DataFrame, op: Dict):
-        header_row = op.get("header_row", 1) - 1
-        col_idx = self._find_column(df, op["identifier"], op["mode"], header_row)
-        if col_idx is None:
-            self._log_line(f"Колонка {op['identifier']} не найдена")
-            return df
-        self._ensure_size(df, header_row, col_idx)
-        df.iat[header_row, col_idx] = op["new"]
-        return df
-
-    def _fill_cell(self, df: pd.DataFrame, op: Dict):
-        col_letter = ''.join([c for c in op["cell"] if c.isalpha()])
-        row_part = ''.join([c for c in op["cell"] if c.isdigit()])
-        if not col_letter or not row_part:
-            self._log_line(f"Неверная ячейка: {op['cell']}")
-            return df
-        row_idx = int(row_part) - 1
-        col_idx = self._column_from_letter(col_letter)
-        self._ensure_size(df, row_idx, col_idx)
-        if op.get("only_empty") and pd.notna(df.iat[row_idx, col_idx]):
-            return df
-        df.iat[row_idx, col_idx] = op.get("value")
-        return df
-
-    def _clear_column(self, df: pd.DataFrame, op: Dict):
-        header_row = op.get("header_row", 1) - 1
-        col_idx = self._find_column(df, op["identifier"], op["mode"], header_row)
-        if col_idx is None:
-            self._log_line(f"Колонка {op['identifier']} не найдена")
-            return df
-        self._ensure_size(df, header_row + 1, col_idx)
-        df.iloc[header_row + 1 :, col_idx] = ""
-        return df
-
-    def _ensure_size(self, df: pd.DataFrame, row_idx: int, col_idx: int):
-        # expand rows
-        while row_idx >= len(df):
-            df.loc[len(df)] = [None] * len(df.columns)
-        while col_idx >= len(df.columns):
-            df[len(df.columns)] = None
-
-    def _find_column(self, df: pd.DataFrame, identifier: str, mode: str, header_row: int):
-        if mode == "letter":
-            return self._column_from_letter(identifier)
-        if header_row < len(df):
-            headers = df.iloc[header_row].tolist()
-            for idx, val in enumerate(headers):
-                if str(val) == identifier:
-                    return idx
-        return None
-
-    def _column_from_letter(self, letter: str) -> int:
-        letter = letter.upper()
-        idx = 0
-        for char in letter:
-            if char in string.ascii_uppercase:
-                idx = idx * 26 + (ord(char) - ord('A') + 1)
-        return idx - 1
-
-    def _read_sheets(self, path: str, preview: bool = False) -> Dict[str, pd.DataFrame]:
-        try:
-            if preview:
-                sheets = pd.read_excel(path, sheet_name=None, header=None, nrows=30)
-            else:
-                sheets = pd.read_excel(path, sheet_name=None, header=None)
-            return {name: df.fillna("") for name, df in sheets.items()}
-        except Exception as exc:  # noqa: BLE001
-            self._log_line(f"Не удалось прочитать {path}: {exc}")
-            return {}
-
-    def _op_matches(self, op: Dict, file_path: str) -> bool:
-        if op.get("scope") == "all":
-            return True
-        return op.get("scope") == file_path
 
     def _short_name(self, path: str, n: int = 5) -> str:
         return path if len(path) <= 2 * n else f"{path[:n]}...{path[-n:]}"
