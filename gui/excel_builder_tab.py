@@ -2,7 +2,7 @@ import os
 from typing import Dict, List
 
 import pandas as pd
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWidgets import (
     QWidget,
     QApplication,
@@ -89,6 +89,7 @@ class ExcelBuilderTab(QWidget):
         self.file_list = QListWidget()
         vbox.addWidget(QLabel(tr("Список загруженных файлов")))
         vbox.addWidget(self.file_list)
+        self._limit_list_rows(self.file_list, 10)
 
         remove_row = QHBoxLayout()
         remove_btn = QPushButton(tr("Удалить выбранные"))
@@ -242,6 +243,7 @@ class ExcelBuilderTab(QWidget):
         vbox.addWidget(QLabel(tr("Запланированные операции")))
         self.operations_list = QListWidget()
         vbox.addWidget(self.operations_list)
+        self._limit_list_rows(self.operations_list, 5)
         return box
 
     def _create_actions_box(self):
@@ -256,9 +258,16 @@ class ExcelBuilderTab(QWidget):
         btn_row.addStretch()
         vbox.addLayout(btn_row)
 
+        self.output_path_label = QLabel(tr("Папка сохранения: не выбрана"))
+        self.output_path_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.output_path_label.setOpenExternalLinks(True)
+        self.output_path_label.setWordWrap(True)
+        vbox.addWidget(self.output_path_label)
+
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         vbox.addWidget(self.log_output)
+        self._limit_text_rows(self.log_output, 5)
         return box
 
     # endregion
@@ -489,6 +498,7 @@ class ExcelBuilderTab(QWidget):
 
         output_root = self.manager.build_output_root()
         os.makedirs(output_root, exist_ok=True)
+        self._update_output_path_link(output_root)
         logger.info(f"Output root: {output_root}")
         for idx, f in enumerate(self.manager.files, start=1):
             progress.setValue(idx - 1)
@@ -575,5 +585,25 @@ class ExcelBuilderTab(QWidget):
             idx, remainder = divmod(idx - 1, 26)
             letters = chr(65 + remainder) + letters
         return letters
+
+    def _limit_list_rows(self, list_widget: QListWidget, rows: int):
+        row_height = list_widget.sizeHintForRow(0)
+        if row_height <= 0:
+            row_height = list_widget.fontMetrics().height() + 8
+        height = rows * row_height + 2 * list_widget.frameWidth()
+        list_widget.setFixedHeight(height)
+        list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+    def _limit_text_rows(self, text_widget: QTextEdit, rows: int):
+        line_height = text_widget.fontMetrics().lineSpacing()
+        margins = int(text_widget.document().documentMargin() * 2)
+        height = rows * line_height + 2 * text_widget.frameWidth() + margins
+        text_widget.setFixedHeight(height)
+        text_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+    def _update_output_path_link(self, path: str):
+        url = QUrl.fromLocalFile(path)
+        link = f'<a href="{url.toString()}">{path}</a>'
+        self.output_path_label.setText(f"{tr('Папка сохранения')}: {link}")
 
     # endregion
