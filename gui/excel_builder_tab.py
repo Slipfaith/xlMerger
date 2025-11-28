@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from utils.i18n import tr
+from utils.i18n import i18n
 from utils.logger import logger
 from core.drag_drop import DragDropLineEdit
 from excel_builder import ExcelBuilderExecutor, ExcelFilesManager
@@ -42,7 +43,10 @@ class ExcelBuilderTab(QWidget):
         self.executor = ExcelBuilderExecutor(log_callback=self._log_line)
         self.operations: List[Dict] = []
         self._last_preview_df = pd.DataFrame()
+        self._output_path: str | None = None
         self.init_ui()
+        i18n.language_changed.connect(self.retranslate_ui)
+        self.retranslate_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -66,57 +70,60 @@ class ExcelBuilderTab(QWidget):
 
     # region UI builders
     def _create_loader_box(self):
-        box = QGroupBox(tr("Загрузка входных данных"))
-        vbox = QVBoxLayout(box)
+        self.loader_box = QGroupBox()
+        vbox = QVBoxLayout(self.loader_box)
         vbox.setSpacing(10)
 
         self.drop_input = DragDropLineEdit(mode="files_or_folder")
-        self.drop_input.setPlaceholderText(tr("Перетащи файлы или папку сюда"))
         self.drop_input.filesSelected.connect(self.add_files)
         self.drop_input.folderSelected.connect(self.add_folder)
         vbox.addWidget(self.drop_input)
 
         btn_row = QHBoxLayout()
-        add_files_btn = QPushButton(tr("Добавить файлы"))
-        add_files_btn.clicked.connect(self.pick_files)
-        add_folder_btn = QPushButton(tr("Добавить папку"))
-        add_folder_btn.clicked.connect(self.pick_folder)
-        btn_row.addWidget(add_files_btn)
-        btn_row.addWidget(add_folder_btn)
+        self.add_files_btn = QPushButton()
+        self.add_files_btn.clicked.connect(self.pick_files)
+        self.add_folder_btn = QPushButton()
+        self.add_folder_btn.clicked.connect(self.pick_folder)
+        btn_row.addWidget(self.add_files_btn)
+        btn_row.addWidget(self.add_folder_btn)
         btn_row.addStretch()
         vbox.addLayout(btn_row)
 
         self.file_list = QListWidget()
-        vbox.addWidget(QLabel(tr("Список загруженных файлов")))
+        self.files_label = QLabel()
+        vbox.addWidget(self.files_label)
         vbox.addWidget(self.file_list)
         self._update_list_rows(self.file_list, 0, max_rows=5)
 
         remove_row = QHBoxLayout()
-        remove_btn = QPushButton(tr("Удалить выбранные"))
-        remove_btn.clicked.connect(self.remove_selected_files)
-        remove_row.addWidget(remove_btn)
+        self.remove_btn = QPushButton()
+        self.remove_btn.clicked.connect(self.remove_selected_files)
+        remove_row.addWidget(self.remove_btn)
         remove_row.addStretch()
         vbox.addLayout(remove_row)
-        return box
+        return self.loader_box
 
     def _create_preview_box(self):
-        box = QGroupBox(tr("Превью"))
-        vbox = QVBoxLayout(box)
+        self.preview_box = QGroupBox()
+        vbox = QVBoxLayout(self.preview_box)
         vbox.setSpacing(8)
 
         selection_row = QHBoxLayout()
-        selection_row.addWidget(QLabel(tr("Файл:")))
+        self.preview_file_label = QLabel()
+        selection_row.addWidget(self.preview_file_label)
         self.preview_file_combo = QComboBox()
         self.preview_file_combo.currentIndexChanged.connect(self._on_preview_file_changed)
         selection_row.addWidget(self.preview_file_combo, 1)
-        selection_row.addWidget(QLabel(tr("Лист:")))
+        self.preview_sheet_label = QLabel()
+        selection_row.addWidget(self.preview_sheet_label)
         self.preview_sheet_combo = QComboBox()
         self.preview_sheet_combo.currentIndexChanged.connect(self.refresh_preview)
         selection_row.addWidget(self.preview_sheet_combo, 1)
         vbox.addLayout(selection_row)
 
         header_row = QHBoxLayout()
-        header_row.addWidget(QLabel(tr("Строка заголовков")))
+        self.header_label = QLabel()
+        header_row.addWidget(self.header_label)
         self.header_spin = QSpinBox()
         self.header_spin.setMinimum(1)
         self.header_spin.setValue(1)
@@ -126,7 +133,8 @@ class ExcelBuilderTab(QWidget):
         vbox.addLayout(header_row)
 
         preview_controls = QHBoxLayout()
-        preview_controls.addWidget(QLabel(tr("Высота превью")))
+        self.preview_height_text = QLabel()
+        preview_controls.addWidget(self.preview_height_text)
         self.preview_height_slider = QSlider(Qt.Horizontal)
         self.preview_height_slider.setRange(120, 800)
         self.preview_height_slider.setValue(120)
@@ -139,7 +147,6 @@ class ExcelBuilderTab(QWidget):
         self.preview_toggle = QToolButton()
         self.preview_toggle.setCheckable(True)
         self.preview_toggle.setChecked(True)
-        self.preview_toggle.setText(tr("Свернуть"))
         self.preview_toggle.toggled.connect(self._toggle_preview_visibility)
         preview_controls.addWidget(self.preview_toggle)
         vbox.addLayout(preview_controls)
@@ -151,114 +158,112 @@ class ExcelBuilderTab(QWidget):
         self.preview_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         vbox.addWidget(self.preview_table)
         self._update_preview_height(self.preview_height_slider.value())
-        return box
+        return self.preview_box
 
     def _create_operations_box(self):
-        box = QGroupBox(tr("Операции"))
-        vbox = QVBoxLayout(box)
+        self.operations_box = QGroupBox()
+        vbox = QVBoxLayout(self.operations_box)
         vbox.setSpacing(10)
 
         scope_row = QHBoxLayout()
-        scope_row.addWidget(QLabel(tr("Применить к:")))
+        self.scope_label = QLabel()
+        scope_row.addWidget(self.scope_label)
         self.scope_combo = QComboBox()
-        self.scope_combo.addItem(tr("Все файлы"), userData="all")
+        self.scope_combo.addItem("", userData="all")
         scope_row.addWidget(self.scope_combo, 1)
         vbox.addLayout(scope_row)
 
         # Header rename
-        header_box = QGroupBox(tr("Редактирование заголовков"))
-        header_layout = QHBoxLayout(header_box)
+        self.header_box = QGroupBox()
+        header_layout = QHBoxLayout(self.header_box)
         self.header_identifier = QComboBox()
         self.header_identifier.setEditable(True)
-        self.header_identifier.lineEdit().setPlaceholderText(tr("A или Текущий заголовок"))
+        self.header_identifier.lineEdit().setPlaceholderText("")
         self.header_new_value = QLineEdit()
-        self.header_new_value.setPlaceholderText(tr("Новый заголовок"))
+        self.header_new_value.setPlaceholderText("")
         self.header_mode = QComboBox()
-        self.header_mode.addItems([tr("По букве"), tr("По тексту")])
+        self.header_mode.addItems(["", ""])
         self.header_mode.currentIndexChanged.connect(self._on_header_mode_changed)
-        header_btn = QPushButton(tr("Добавить"))
-        header_btn.clicked.connect(self.add_header_operation)
+        self.header_btn = QPushButton()
+        self.header_btn.clicked.connect(self.add_header_operation)
         header_layout.addWidget(self.header_identifier)
         header_layout.addWidget(self.header_new_value)
         header_layout.addWidget(self.header_mode)
-        header_layout.addWidget(header_btn)
-        vbox.addWidget(header_box)
+        header_layout.addWidget(self.header_btn)
+        vbox.addWidget(self.header_box)
 
         # Fill cell
-        fill_box = QGroupBox(tr("Заполнение значения"))
-        fill_layout = QVBoxLayout(fill_box)
-        fill_description = QLabel(
-            tr("Позволяет задать конкретную ячейку и новое значение. Можно заполнить только пустые ячейки."),
-        )
-        fill_description.setWordWrap(True)
+        self.fill_box = QGroupBox()
+        fill_layout = QVBoxLayout(self.fill_box)
+        self.fill_description = QLabel()
+        self.fill_description.setWordWrap(True)
         self.fill_cell = QLineEdit()
         self.fill_cell.setPlaceholderText("C1")
         self.fill_value = QLineEdit()
-        self.fill_value.setPlaceholderText(tr("Значение"))
-        self.fill_only_empty = QCheckBox(tr("Только пустые"))
-        fill_btn = QPushButton(tr("Добавить"))
-        fill_btn.clicked.connect(self.add_fill_operation)
+        self.fill_only_empty = QCheckBox()
+        self.fill_btn = QPushButton()
+        self.fill_btn.clicked.connect(self.add_fill_operation)
         fill_row = QHBoxLayout()
         fill_row.addWidget(self.fill_cell)
         fill_row.addWidget(self.fill_value)
         fill_row.addWidget(self.fill_only_empty)
-        fill_row.addWidget(fill_btn)
-        fill_layout.addWidget(fill_description)
+        fill_row.addWidget(self.fill_btn)
+        fill_layout.addWidget(self.fill_description)
         fill_layout.addLayout(fill_row)
-        vbox.addWidget(fill_box)
+        vbox.addWidget(self.fill_box)
 
         # Rename sheets
-        sheet_box = QGroupBox(tr("Переименование листов"))
-        sheet_layout = QHBoxLayout(sheet_box)
+        self.sheet_box = QGroupBox()
+        sheet_layout = QHBoxLayout(self.sheet_box)
         self.old_sheet = QComboBox()
         self.old_sheet.setEditable(True)
-        self.old_sheet.lineEdit().setPlaceholderText(tr("Старое имя"))
+        self.old_sheet.lineEdit().setPlaceholderText("")
         self.new_sheet = QLineEdit()
-        self.new_sheet.setPlaceholderText(tr("Новое имя"))
-        sheet_btn = QPushButton(tr("Добавить"))
-        sheet_btn.clicked.connect(self.add_sheet_rename_operation)
+        self.sheet_btn = QPushButton()
+        self.sheet_btn.clicked.connect(self.add_sheet_rename_operation)
         sheet_layout.addWidget(self.old_sheet)
         sheet_layout.addWidget(self.new_sheet)
-        sheet_layout.addWidget(sheet_btn)
-        vbox.addWidget(sheet_box)
+        sheet_layout.addWidget(self.sheet_btn)
+        vbox.addWidget(self.sheet_box)
 
         # Clear column
-        clear_box = QGroupBox(tr("Очистка колонки"))
-        clear_layout = QHBoxLayout(clear_box)
+        self.clear_box = QGroupBox()
+        clear_layout = QHBoxLayout(self.clear_box)
         self.clear_identifier = QComboBox()
         self.clear_identifier.setEditable(True)
-        self.clear_identifier.lineEdit().setPlaceholderText(tr("Буква или заголовок"))
+        self.clear_identifier.lineEdit().setPlaceholderText("")
         self.clear_mode = QComboBox()
-        self.clear_mode.addItems([tr("По букве"), tr("По тексту")])
+        self.clear_mode.addItems(["", ""])
         self.clear_mode.currentIndexChanged.connect(self._on_header_mode_changed)
-        self.clear_format = QCheckBox(tr("Очистить формат"))
-        clear_btn = QPushButton(tr("Добавить"))
-        clear_btn.clicked.connect(self.add_clear_operation)
+        self.clear_format = QCheckBox()
+        self.clear_btn = QPushButton()
+        self.clear_btn.clicked.connect(self.add_clear_operation)
         clear_layout.addWidget(self.clear_identifier)
         clear_layout.addWidget(self.clear_mode)
         clear_layout.addWidget(self.clear_format)
-        clear_layout.addWidget(clear_btn)
-        vbox.addWidget(clear_box)
+        clear_layout.addWidget(self.clear_btn)
+        vbox.addWidget(self.clear_box)
 
-        vbox.addWidget(QLabel(tr("Запланированные операции")))
+        self.operations_label = QLabel()
+        vbox.addWidget(self.operations_label)
         self.operations_list = QListWidget()
         vbox.addWidget(self.operations_list)
         self._update_list_rows(self.operations_list, 0, max_rows=5)
-        return box
+        return self.operations_box
 
     def _create_actions_box(self):
-        box = QGroupBox(tr("Применение и сохранение"))
-        vbox = QVBoxLayout(box)
+        self.actions_box = QGroupBox()
+        vbox = QVBoxLayout(self.actions_box)
         vbox.setSpacing(8)
 
         btn_row = QHBoxLayout()
-        self.execute_btn = QPushButton(tr("Выполнить"))
+        self.execute_btn = QPushButton()
         self.execute_btn.clicked.connect(self.execute)
         btn_row.addWidget(self.execute_btn)
         btn_row.addStretch()
         vbox.addLayout(btn_row)
 
-        self.output_path_label = QLabel(tr("Папка сохранения: не выбрана"))
+        self.output_path_label = QLabel()
         self.output_path_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.output_path_label.setOpenExternalLinks(True)
         self.output_path_label.setWordWrap(True)
@@ -268,7 +273,69 @@ class ExcelBuilderTab(QWidget):
         self.log_output.setReadOnly(True)
         vbox.addWidget(self.log_output)
         self._limit_text_rows(self.log_output, 5)
-        return box
+        return self.actions_box
+
+    def retranslate_ui(self):
+        # Loader
+        self.loader_box.setTitle(tr("Загрузка входных данных"))
+        self.drop_input.setPlaceholderText(tr("Перетащи файлы или папку сюда"))
+        self.add_files_btn.setText(tr("Добавить файлы"))
+        self.add_folder_btn.setText(tr("Добавить папку"))
+        self.files_label.setText(tr("Список загруженных файлов"))
+        self.remove_btn.setText(tr("Удалить выбранные"))
+
+        # Preview
+        self.preview_box.setTitle(tr("Превью"))
+        self.preview_file_label.setText(tr("Файл:"))
+        self.preview_sheet_label.setText(tr("Лист:"))
+        self.header_label.setText(tr("Строка заголовков"))
+        self.preview_height_text.setText(tr("Высота превью"))
+        self.preview_toggle.setText(tr("Свернуть") if self.preview_toggle.isChecked() else tr("Показать"))
+        if self.preview_toggle.isChecked():
+            self.preview_height_label.setText(f"{self.preview_height_slider.value()} px")
+        else:
+            self.preview_height_label.setText(tr("Скрыто"))
+
+        # Operations
+        self.operations_box.setTitle(tr("Операции"))
+        self.scope_label.setText(tr("Применить к:"))
+        if self.scope_combo.count() > 0:
+            self.scope_combo.setItemText(0, tr("Все файлы"))
+        self.header_box.setTitle(tr("Редактирование заголовков"))
+        self.header_identifier.lineEdit().setPlaceholderText(tr("A или Текущий заголовок"))
+        self.header_new_value.setPlaceholderText(tr("Новый заголовок"))
+        self.header_mode.setItemText(0, tr("По букве"))
+        self.header_mode.setItemText(1, tr("По тексту"))
+        self.header_btn.setText(tr("Добавить"))
+
+        self.fill_box.setTitle(tr("Заполнение значения"))
+        self.fill_description.setText(tr("Позволяет задать конкретную ячейку и новое значение. Можно заполнить только пустые ячейки."))
+        self.fill_value.setPlaceholderText(tr("Значение"))
+        self.fill_only_empty.setText(tr("Только пустые"))
+        self.fill_btn.setText(tr("Добавить"))
+
+        self.sheet_box.setTitle(tr("Переименование листов"))
+        self.old_sheet.lineEdit().setPlaceholderText(tr("Старое имя"))
+        self.new_sheet.setPlaceholderText(tr("Новое имя"))
+        self.sheet_btn.setText(tr("Добавить"))
+
+        self.clear_box.setTitle(tr("Очистка колонки"))
+        self.clear_identifier.lineEdit().setPlaceholderText(tr("Буква или заголовок"))
+        self.clear_mode.setItemText(0, tr("По букве"))
+        self.clear_mode.setItemText(1, tr("По тексту"))
+        self.clear_format.setText(tr("Очистить формат"))
+        self.clear_btn.setText(tr("Добавить"))
+
+        self.operations_label.setText(tr("Запланированные операции"))
+        self._refresh_operations_list()
+
+        # Actions
+        self.actions_box.setTitle(tr("Применение и сохранение"))
+        self.execute_btn.setText(tr("Выполнить"))
+        if self._output_path:
+            self._update_output_path_link(self._output_path)
+        else:
+            self.output_path_label.setText(tr("Папка сохранения: не выбрана"))
 
     # endregion
 
@@ -470,6 +537,20 @@ class ExcelBuilderTab(QWidget):
         self.operations_list.addItem(desc)
         self._update_list_rows(self.operations_list, self.operations_list.count(), max_rows=5)
 
+    def _refresh_operations_list(self):
+        current_count = self.operations_list.count()
+        self.operations_list.clear()
+        for op in self.operations:
+            prefix_map = {
+                "rename_header": tr("Заголовок"),
+                "fill_cell": tr("Заполнить"),
+                "rename_sheet": tr("Лист"),
+                "clear_column": tr("Очистка"),
+            }
+            prefix = prefix_map.get(op.get("type"), str(op.get("type", "")))
+            self._append_operation_item(prefix, op)
+        self._update_list_rows(self.operations_list, self.operations_list.count(), max_rows=max(current_count, 5))
+
     def _describe_operation(self, op: Dict) -> str:
         scope = tr("все") if op.get("scope") == "all" else self._display_name(op.get("scope", ""))
         if op["type"] == "rename_header":
@@ -572,9 +653,11 @@ class ExcelBuilderTab(QWidget):
         self._update_header_suggestions(self._last_preview_df)
 
     def _update_preview_height(self, value: int):
-        self.preview_height_label.setText(f"{value} px")
         if self.preview_toggle.isChecked():
+            self.preview_height_label.setText(f"{value} px")
             self.preview_table.setFixedHeight(value)
+        else:
+            self.preview_height_label.setText(tr("Скрыто"))
         self.preview_table.setMinimumHeight(value)
 
     def _toggle_preview_visibility(self, checked: bool):
@@ -613,6 +696,7 @@ class ExcelBuilderTab(QWidget):
     def _update_output_path_link(self, path: str):
         url = QUrl.fromLocalFile(path)
         link = f'<a href="{url.toString()}">{path}</a>'
+        self._output_path = path
         self.output_path_label.setText(f"{tr('Папка сохранения')}: {link}")
 
     # endregion
