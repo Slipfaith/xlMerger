@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
 
         self.excel_builder_widget = ExcelBuilderTab()
         settings_icon = self._get_settings_icon()
-        self.tab_widget.addTab(self.excel_builder_widget, "")
+        self.tab_widget.addTab(self.excel_builder_widget, self._get_builder_tab_text())
         self.tab_widget.setTabIcon(4, settings_icon)
         self.tab_widget.setTabToolTip(4, tr("Конструктор Excel"))
 
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.tab_widget.setTabText(3, tr("Объединить"))
-        self.tab_widget.setTabText(4, "")
+        self.tab_widget.setTabText(4, self._get_builder_tab_text())
         self.tab_widget.setTabIcon(4, self._get_settings_icon())
         self.tab_widget.setTabToolTip(4, tr("Конструктор Excel"))
 
@@ -201,6 +201,9 @@ class MainWindow(QMainWindow):
         painter.end()
 
         return QIcon(pixmap)
+
+    def _get_builder_tab_text(self) -> str:
+        return f"⚙ {tr('Конструктор Excel')}"
 
     def show_about(self):
         info_text = (
