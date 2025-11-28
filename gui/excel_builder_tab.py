@@ -89,7 +89,7 @@ class ExcelBuilderTab(QWidget):
         self.file_list = QListWidget()
         vbox.addWidget(QLabel(tr("Список загруженных файлов")))
         vbox.addWidget(self.file_list)
-        self._limit_list_rows(self.file_list, 10)
+        self._update_list_rows(self.file_list, 0, max_rows=5)
 
         remove_row = QHBoxLayout()
         remove_btn = QPushButton(tr("Удалить выбранные"))
@@ -243,7 +243,7 @@ class ExcelBuilderTab(QWidget):
         vbox.addWidget(QLabel(tr("Запланированные операции")))
         self.operations_list = QListWidget()
         vbox.addWidget(self.operations_list)
-        self._limit_list_rows(self.operations_list, 5)
+        self._update_list_rows(self.operations_list, 0, max_rows=5)
         return box
 
     def _create_actions_box(self):
@@ -300,15 +300,17 @@ class ExcelBuilderTab(QWidget):
         self.scope_combo.clear()
         self.scope_combo.addItem(tr("Все файлы"), userData="all")
         for f in self.manager.files:
-            item = QListWidgetItem(self._short_name(os.path.basename(f["path"])))
+            name = self._display_name(f["path"])
+            item = QListWidgetItem(self._short_name(name))
             item.setToolTip(f["path"])
             self.file_list.addItem(item)
 
-            self.preview_file_combo.addItem(self._short_name(os.path.basename(f["path"])), userData=f)
-            self.scope_combo.addItem(self._short_name(os.path.basename(f["path"])), userData=f["path"])
+            self.preview_file_combo.addItem(self._short_name(name), userData=f)
+            self.scope_combo.addItem(self._short_name(name), userData=f["path"])
         self.preview_file_combo.blockSignals(False)
         self.scope_combo.blockSignals(False)
         self._on_preview_file_changed()
+        self._update_list_rows(self.file_list, self.file_list.count(), max_rows=5)
 
     def remove_selected_files(self):
         rows = sorted({index.row() for index in self.file_list.selectedIndexes()}, reverse=True)
@@ -461,9 +463,10 @@ class ExcelBuilderTab(QWidget):
     def _append_operation_item(self, prefix: str, operation: Dict):
         desc = f"{prefix}: {self._describe_operation(operation)}"
         self.operations_list.addItem(desc)
+        self._update_list_rows(self.operations_list, self.operations_list.count(), max_rows=5)
 
     def _describe_operation(self, op: Dict) -> str:
-        scope = tr("все") if op.get("scope") == "all" else self._short_name(os.path.basename(op.get("scope", "")))
+        scope = tr("все") if op.get("scope") == "all" else self._short_name(self._display_name(op.get("scope", "")))
         if op["type"] == "rename_header":
             return f"[{scope}] {op['sheet']}: {op['identifier']} -> {op['new']}"
         if op["type"] == "fill_cell":
@@ -502,7 +505,7 @@ class ExcelBuilderTab(QWidget):
         logger.info(f"Output root: {output_root}")
         for idx, f in enumerate(self.manager.files, start=1):
             progress.setValue(idx - 1)
-            progress.setLabelText(os.path.basename(f["path"]))
+            progress.setLabelText(self._display_name(f["path"]))
             QApplication.processEvents()
             try:
                 self.executor.process_file(f, output_root, target_ops)
@@ -513,6 +516,11 @@ class ExcelBuilderTab(QWidget):
                 break
         progress.setValue(len(self.manager.files))
         QMessageBox.information(self, tr("Готово"), tr("Обработка завершена"))
+
+    def _display_name(self, path: str) -> str:
+        base = os.path.basename(path)
+        name, _ = os.path.splitext(base)
+        return name
 
     def _short_name(self, path: str, n: int = 5) -> str:
         return path if len(path) <= 2 * n else f"{path[:n]}...{path[-n:]}"
@@ -586,11 +594,12 @@ class ExcelBuilderTab(QWidget):
             letters = chr(65 + remainder) + letters
         return letters
 
-    def _limit_list_rows(self, list_widget: QListWidget, rows: int):
+    def _update_list_rows(self, list_widget: QListWidget, items_count: int, max_rows: int, min_rows: int = 1):
         row_height = list_widget.sizeHintForRow(0)
         if row_height <= 0:
             row_height = list_widget.fontMetrics().height() + 8
-        height = rows * row_height + 2 * list_widget.frameWidth()
+        visible_rows = min(max(items_count, min_rows), max_rows)
+        height = visible_rows * row_height + 2 * list_widget.frameWidth()
         list_widget.setFixedHeight(height)
         list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
