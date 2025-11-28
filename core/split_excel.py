@@ -21,6 +21,16 @@ def _normalize_color(color) -> str | None:
     rgb = getattr(color, "rgb", None)
     if not rgb:
         return None
+    if isinstance(rgb, bytes):
+        rgb = rgb.decode()
+    # Some color objects expose an RGB helper instead of a plain string
+    if not isinstance(rgb, str):
+        nested_rgb = getattr(rgb, "rgb", None) or getattr(rgb, "value", None)
+        if isinstance(nested_rgb, bytes):
+            nested_rgb = nested_rgb.decode()
+        rgb = nested_rgb if isinstance(nested_rgb, str) else None
+    if not rgb:
+        return None
     if len(rgb) == 8:
         return rgb[-6:]
     if len(rgb) == 6:
