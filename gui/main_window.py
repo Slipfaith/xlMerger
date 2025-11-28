@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
         self.lang_en_action = lang_en
         self.lang_ru_action = lang_ru
 
-        self.builder_action = QAction(self._get_settings_icon(), "", self)
+        self.builder_action = QAction(self._get_settings_icon(), "⚙", self)
         self.builder_action.triggered.connect(self.show_builder_page)
         menubar.addAction(self.builder_action)
 
