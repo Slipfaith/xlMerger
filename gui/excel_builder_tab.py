@@ -147,7 +147,7 @@ class ExcelBuilderTab(QWidget):
         self.preview_table = QTableWidget()
         self.preview_table.setRowCount(0)
         self.preview_table.setColumnCount(0)
-        self.preview_table.setMinimumHeight(320)
+        self.preview_table.setMinimumHeight(120)
         self.preview_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         vbox.addWidget(self.preview_table)
         self._update_preview_height(self.preview_height_slider.value())
