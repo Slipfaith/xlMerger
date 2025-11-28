@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         self.setWindowTitle(tr("xlMerger: объединяй и проверяй"))
-        self.setWindowIcon(QIcon(r"C:\\Users\\yanismik\\Desktop\\PythonProject1\\xlM_2.0\\xlM2.0.ico"))
+        self.setWindowIcon(self._get_app_icon())
         self.setMinimumSize(650, 450)
 
         self.tab_widget = QTabWidget()
@@ -238,6 +238,24 @@ class MainWindow(QMainWindow):
         painter.setBrush(Qt.black)
         painter.setFont(QFont(self.font().family(), 20))
         painter.drawText(pixmap.rect(), Qt.AlignCenter, "⚙")
+        painter.end()
+
+        return QIcon(pixmap)
+
+    def _get_app_icon(self) -> QIcon:
+        icon = QIcon.fromTheme("spreadsheet")
+        if not icon.isNull():
+            return icon
+
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(Qt.black)
+        painter.setFont(QFont(self.font().family(), 28, QFont.Bold))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, "XL")
         painter.end()
 
         return QIcon(pixmap)
