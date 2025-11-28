@@ -1,6 +1,10 @@
 import os
 from openpyxl import Workbook, load_workbook
-from core.split_excel import split_excel_by_languages, split_excel_multiple_sheets
+from core.split_excel import (
+    split_excel_by_languages,
+    split_excel_multiple_sheets,
+    _normalize_color,
+)
 
 
 def test_split_excel_without_header(tmp_path):
@@ -24,6 +28,17 @@ def test_split_excel_without_header(tmp_path):
     assert ws_out.cell(row=2, column=1).value == "привет"
     assert ws_out.cell(row=2, column=2).value == "hallo"
     wb_out.close()
+
+
+def test_normalize_color_with_non_string_rgb():
+    class DummyRGB:
+        pass
+
+    class DummyColor:
+        def __init__(self):
+            self.rgb = DummyRGB()
+
+    assert _normalize_color(DummyColor()) is None
 
 def test_split_excel(tmp_path):
     src = tmp_path / "main.xlsx"
