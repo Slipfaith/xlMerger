@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
-from PySide6.QtGui import QAction, QIcon, QFont
+from PySide6.QtGui import QAction, QIcon, QFont, QPixmap, QPainter
 from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
 from __init__ import __version__
@@ -38,7 +38,10 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.merge_tab_widget, tr("Объединить"))
 
         self.excel_builder_widget = ExcelBuilderTab()
-        self.tab_widget.addTab(self.excel_builder_widget, tr("Конструктор Excel"))
+        settings_icon = self._get_settings_icon()
+        self.tab_widget.addTab(self.excel_builder_widget, "")
+        self.tab_widget.setTabIcon(4, settings_icon)
+        self.tab_widget.setTabToolTip(4, tr("Конструктор Excel"))
 
         self.setCentralWidget(self.tab_widget)
         self.apply_modern_style()
@@ -145,7 +148,9 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.tab_widget.setTabText(3, tr("Объединить"))
-        self.tab_widget.setTabText(4, tr("Конструктор Excel"))
+        self.tab_widget.setTabText(4, "")
+        self.tab_widget.setTabIcon(4, self._get_settings_icon())
+        self.tab_widget.setTabToolTip(4, tr("Конструктор Excel"))
 
     def init_menu(self):
         menubar = self.menuBar()
@@ -178,6 +183,24 @@ class MainWindow(QMainWindow):
         self.about_action = about_action
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
+
+    def _get_settings_icon(self) -> QIcon:
+        icon = QIcon.fromTheme("settings")
+        if not icon.isNull():
+            return icon
+
+        pixmap = QPixmap(32, 32)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(Qt.black)
+        painter.setFont(QFont(self.font().family(), 20))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, "⚙")
+        painter.end()
+
+        return QIcon(pixmap)
 
     def show_about(self):
         info_text = (

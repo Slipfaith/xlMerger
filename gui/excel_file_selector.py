@@ -54,8 +54,10 @@ class ExcelFileSelector(QDialog):
 
     def add_file_to_list(self, file_path):
         """Добавление файла в QListWidget."""
-        item = QListWidgetItem(os.path.splitext(os.path.basename(file_path))[0])
+        file_name = os.path.basename(file_path)
+        item = QListWidgetItem(file_name)
         item.setData(Qt.UserRole, file_path)
+        item.setToolTip(file_name)
         self.file_list.addItem(item)
 
     def show_warning_no_files(self):
