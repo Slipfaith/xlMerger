@@ -133,35 +133,35 @@ def split_excel_by_languages(
                 extra_headers.append(col_names[idx])
 
     created: List[str] = []
-    for i, (target_lang, idx) in enumerate(targets, start=1):
-        new_wb = Workbook()
-        ws_new = new_wb.active
-        ws_new.title = sheet_name
-        col_pos = 1
-        _copy_cell(sheet.cell(row=1, column=source_idx), ws_new.cell(row=1, column=col_pos))
-        ws_new.cell(row=1, column=col_pos).value = source_header
-        _copy_column_width(sheet, ws_new, source_idx, col_pos)
-        col_pos += 1
-        _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
-        ws_new.cell(row=1, column=col_pos).value = target_lang
-        _copy_column_width(sheet, ws_new, idx, col_pos)
-        col_pos += 1
-        for header in extra_headers:
-            ex_idx = header_map[header]
-            _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
-            ws_new.cell(row=1, column=col_pos).value = header
-            _copy_column_width(sheet, ws_new, ex_idx, col_pos)
+        for i, (target_lang, idx) in enumerate(targets, start=1):
+            new_wb = Workbook()
+            ws_new = new_wb.active
+            ws_new.title = sheet_name
+            col_pos = 1
+            for header in extra_headers:
+                ex_idx = header_map[header]
+                _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
+                ws_new.cell(row=1, column=col_pos).value = header
+                _copy_column_width(sheet, ws_new, ex_idx, col_pos)
+                col_pos += 1
+            _copy_cell(sheet.cell(row=1, column=source_idx), ws_new.cell(row=1, column=col_pos))
+            ws_new.cell(row=1, column=col_pos).value = source_header
+            _copy_column_width(sheet, ws_new, source_idx, col_pos)
             col_pos += 1
-        last_row = _find_last_data_row(sheet, [source_idx, idx, *extra_idx])
+            _copy_cell(sheet.cell(row=1, column=idx), ws_new.cell(row=1, column=col_pos))
+            ws_new.cell(row=1, column=col_pos).value = target_lang
+            _copy_column_width(sheet, ws_new, idx, col_pos)
+            col_pos += 1
+        last_row = _find_last_data_row(sheet, [*extra_idx, source_idx, idx])
         for row in range(2, last_row + 1):
             col_pos = 1
+            for ex_idx in extra_idx:
+                _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
+                col_pos += 1
             _copy_cell(sheet.cell(row=row, column=source_idx), ws_new.cell(row=row, column=col_pos))
             col_pos += 1
             _copy_cell(sheet.cell(row=row, column=idx), ws_new.cell(row=row, column=col_pos))
             col_pos += 1
-            for ex_idx in extra_idx:
-                _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
-                col_pos += 1
         base, ext = os.path.splitext(os.path.basename(excel_path))
         out_name = f"{base}_{source_header}-{target_lang}{ext}"
         out_path = os.path.join(output_dir, out_name)
@@ -262,6 +262,12 @@ def split_excel_multiple_sheets(
 
             if ws_new.max_row == 1 and ws_new.max_column == 1 and ws_new.cell(row=1, column=1).value is None:
                 col_pos = 1
+                for header in extra_headers:
+                    ex_idx = header_map[header]
+                    _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
+                    ws_new.cell(row=1, column=col_pos).value = header
+                    _copy_column_width(sheet, ws_new, ex_idx, col_pos)
+                    col_pos += 1
                 _copy_cell(sheet.cell(row=1, column=src_idx), ws_new.cell(row=1, column=col_pos))
                 ws_new.cell(row=1, column=col_pos).value = src_name
                 _copy_column_width(sheet, ws_new, src_idx, col_pos)
@@ -270,23 +276,17 @@ def split_excel_multiple_sheets(
                 ws_new.cell(row=1, column=col_pos).value = tgt_name
                 _copy_column_width(sheet, ws_new, idx, col_pos)
                 col_pos += 1
-                for header in extra_headers:
-                    ex_idx = header_map[header]
-                    _copy_cell(sheet.cell(row=1, column=ex_idx), ws_new.cell(row=1, column=col_pos))
-                    ws_new.cell(row=1, column=col_pos).value = header
-                    _copy_column_width(sheet, ws_new, ex_idx, col_pos)
-                    col_pos += 1
 
-            last_row = _find_last_data_row(sheet, [src_idx, idx, *extra_idx])
+            last_row = _find_last_data_row(sheet, [*extra_idx, src_idx, idx])
             for row in range(2, last_row + 1):
                 col_pos = 1
+                for ex_idx in extra_idx:
+                    _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
+                    col_pos += 1
                 _copy_cell(sheet.cell(row=row, column=src_idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
                 _copy_cell(sheet.cell(row=row, column=idx), ws_new.cell(row=row, column=col_pos))
                 col_pos += 1
-                for ex_idx in extra_idx:
-                    _copy_cell(sheet.cell(row=row, column=ex_idx), ws_new.cell(row=row, column=col_pos))
-                    col_pos += 1
 
     base, ext = os.path.splitext(os.path.basename(excel_path))
     sources = source_names
