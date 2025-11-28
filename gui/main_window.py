@@ -8,6 +8,7 @@ from .file_processor_app import FileProcessorApp
 from .limits_checker import LimitsChecker
 from .split_tab import SplitTab
 from .merge_tab import MergeTab
+from .excel_builder_tab import ExcelBuilderTab
 
 
 class MainWindow(QMainWindow):
@@ -35,6 +36,9 @@ class MainWindow(QMainWindow):
 
         self.merge_tab_widget = MergeTab()
         self.tab_widget.addTab(self.merge_tab_widget, tr("Объединить"))
+
+        self.excel_builder_widget = ExcelBuilderTab()
+        self.tab_widget.addTab(self.excel_builder_widget, tr("Конструктор Excel"))
 
         self.setCentralWidget(self.tab_widget)
         self.apply_modern_style()
@@ -141,6 +145,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(1, tr("Лимит чек"))
         self.tab_widget.setTabText(2, tr("xlSpliter"))
         self.tab_widget.setTabText(3, tr("Объединить"))
+        self.tab_widget.setTabText(4, tr("Конструктор Excel"))
 
     def init_menu(self):
         menubar = self.menuBar()
