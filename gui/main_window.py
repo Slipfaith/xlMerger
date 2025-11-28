@@ -41,10 +41,10 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.limits_checker_widget, tr("Лимит чек"))
 
         self.split_tab_widget = SplitTab()
-        self.tab_widget.addTab(self.split_tab_widget, tr("xlSpliter"))
+        self.tab_widget.addTab(self.split_tab_widget, "xlSplit")
 
         self.merge_tab_widget = MergeTab()
-        self.tab_widget.addTab(self.merge_tab_widget, tr("Объединить"))
+        self.tab_widget.addTab(self.merge_tab_widget, "xlCombine")
 
         self.main_screen = QWidget()
         main_layout = QVBoxLayout(self.main_screen)
@@ -161,8 +161,8 @@ class MainWindow(QMainWindow):
         self.language_menu.setTitle(tr("Language"))
         self.tab_widget.setTabText(0, tr("xlMerger"))
         self.tab_widget.setTabText(1, tr("Лимит чек"))
-        self.tab_widget.setTabText(2, tr("xlSpliter"))
-        self.tab_widget.setTabText(3, tr("Объединить"))
+        self.tab_widget.setTabText(2, "xlSplit")
+        self.tab_widget.setTabText(3, "xlCombine")
         self.builder_action.setText(tr("xlCraft"))
         self.builder_action.setToolTip(tr("Конструктор Excel"))
         self.back_button.setText(self._get_back_button_text())
