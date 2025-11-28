@@ -57,8 +57,6 @@ class ExcelBuilderExecutor:
             return
 
         rename_ops = [op for op in operations if op["type"] == "rename_sheet" and self._op_matches(op, file_info["path"])]
-        if rename_ops:
-            self._rename_sheets_openpyxl(workbook, rename_ops)
 
         for op in operations:
             if op["type"] == "rename_sheet":
@@ -79,6 +77,9 @@ class ExcelBuilderExecutor:
             elif op["type"] == "clear_column":
                 self._clear_column_openpyxl(sheet, op)
 
+        if rename_ops:
+            self._rename_sheets_openpyxl(workbook, rename_ops)
+
         rel_path = file_info["rel"]
         dest_path = os.path.join(output_root, rel_path)
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
@@ -89,8 +90,6 @@ class ExcelBuilderExecutor:
     # region operation handling
     def _apply_operations(self, sheets: Dict[str, pd.DataFrame], operations: List[Dict], file_path: str):
         rename_ops = [op for op in operations if op["type"] == "rename_sheet" and self._op_matches(op, file_path)]
-        if rename_ops:
-            sheets = self._rename_sheets(sheets, rename_ops)
 
         for op in operations:
             if op["type"] == "rename_sheet":
@@ -111,6 +110,9 @@ class ExcelBuilderExecutor:
             elif op["type"] == "clear_column":
                 df = self._clear_column(df, op)
             sheets[sheet_name] = df
+
+        if rename_ops:
+            sheets = self._rename_sheets(sheets, rename_ops)
         return sheets
 
     def _rename_sheets(self, sheets: Dict[str, pd.DataFrame], operations: List[Dict]):
