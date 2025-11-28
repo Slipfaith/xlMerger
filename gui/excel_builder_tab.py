@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QScrollArea,
     QSizePolicy,
+    QSlider,
+    QToolButton,
 )
 
 from utils.i18n import tr
@@ -39,6 +41,7 @@ class ExcelBuilderTab(QWidget):
         self.manager = ExcelFilesManager()
         self.executor = ExcelBuilderExecutor(log_callback=self._log_line)
         self.operations: List[Dict] = []
+        self._last_preview_df = pd.DataFrame()
         self.init_ui()
 
     def init_ui(self):
@@ -121,12 +124,32 @@ class ExcelBuilderTab(QWidget):
         header_row.addStretch()
         vbox.addLayout(header_row)
 
+        preview_controls = QHBoxLayout()
+        preview_controls.addWidget(QLabel(tr("Высота превью")))
+        self.preview_height_slider = QSlider(Qt.Horizontal)
+        self.preview_height_slider.setRange(120, 800)
+        self.preview_height_slider.setValue(320)
+        self.preview_height_slider.setSingleStep(10)
+        self.preview_height_slider.valueChanged.connect(self._update_preview_height)
+        preview_controls.addWidget(self.preview_height_slider, 1)
+        self.preview_height_label = QLabel("320 px")
+        preview_controls.addWidget(self.preview_height_label)
+
+        self.preview_toggle = QToolButton()
+        self.preview_toggle.setCheckable(True)
+        self.preview_toggle.setChecked(True)
+        self.preview_toggle.setText(tr("Свернуть"))
+        self.preview_toggle.toggled.connect(self._toggle_preview_visibility)
+        preview_controls.addWidget(self.preview_toggle)
+        vbox.addLayout(preview_controls)
+
         self.preview_table = QTableWidget()
         self.preview_table.setRowCount(0)
         self.preview_table.setColumnCount(0)
         self.preview_table.setMinimumHeight(320)
         self.preview_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         vbox.addWidget(self.preview_table)
+        self._update_preview_height(self.preview_height_slider.value())
         return box
 
     def _create_operations_box(self):
@@ -151,6 +174,7 @@ class ExcelBuilderTab(QWidget):
         self.header_new_value.setPlaceholderText(tr("Новый заголовок"))
         self.header_mode = QComboBox()
         self.header_mode.addItems([tr("По букве"), tr("По тексту")])
+        self.header_mode.currentIndexChanged.connect(self._on_header_mode_changed)
         header_btn = QPushButton(tr("Добавить"))
         header_btn.clicked.connect(self.add_header_operation)
         header_layout.addWidget(self.header_identifier)
@@ -205,6 +229,7 @@ class ExcelBuilderTab(QWidget):
         self.clear_identifier.lineEdit().setPlaceholderText(tr("Буква или заголовок"))
         self.clear_mode = QComboBox()
         self.clear_mode.addItems([tr("По букве"), tr("По тексту")])
+        self.clear_mode.currentIndexChanged.connect(self._on_header_mode_changed)
         self.clear_format = QCheckBox(tr("Очистить формат"))
         clear_btn = QPushButton(tr("Добавить"))
         clear_btn.clicked.connect(self.add_clear_operation)
@@ -313,6 +338,7 @@ class ExcelBuilderTab(QWidget):
         if sheet_name:
             self.old_sheet.setCurrentText(sheet_name)
         df = sheets[sheet_name].head(30)
+        self._last_preview_df = df
         self._populate_table(df)
         self._update_header_suggestions(df)
 
@@ -334,6 +360,7 @@ class ExcelBuilderTab(QWidget):
         self.preview_table.clear()
         self.preview_table.setRowCount(0)
         self.preview_table.setColumnCount(0)
+        self._last_preview_df = pd.DataFrame()
         self._update_header_suggestions(pd.DataFrame())
 
     # region operation adders
@@ -504,22 +531,42 @@ class ExcelBuilderTab(QWidget):
                 if pd.notna(val) and str(val)
             ]
         letters = [self._column_letter(idx) for idx in range(len(df.columns))]
-        combined = []
-        seen = set()
-        for value in letters + headers:
-            if value in seen:
-                continue
-            seen.add(value)
-            combined.append(value)
 
-        for combo in (self.header_identifier, self.clear_identifier):
-            combo.blockSignals(True)
-            text = combo.currentText()
-            combo.clear()
-            for item in combined:
-                combo.addItem(item)
-            combo.setCurrentText(text if text else (headers[0] if headers else (letters[0] if letters else "")))
-            combo.blockSignals(False)
+        self._set_identifier_options(self.header_identifier, self.header_mode.currentIndex(), letters, headers)
+        self._set_identifier_options(self.clear_identifier, self.clear_mode.currentIndex(), letters, headers)
+
+    def _set_identifier_options(self, combo: QComboBox, mode: int, letters: List[str], headers: List[str]):
+        options = letters if mode == 0 else headers
+        combo.blockSignals(True)
+        text = combo.currentText()
+        combo.clear()
+        for item in options:
+            combo.addItem(item)
+        if text and text in options:
+            combo.setCurrentText(text)
+        elif options:
+            combo.setCurrentIndex(0)
+        else:
+            combo.setCurrentText("")
+        combo.blockSignals(False)
+
+    def _on_header_mode_changed(self):
+        self._update_header_suggestions(self._last_preview_df)
+
+    def _update_preview_height(self, value: int):
+        self.preview_height_label.setText(f"{value} px")
+        if self.preview_toggle.isChecked():
+            self.preview_table.setFixedHeight(value)
+        self.preview_table.setMinimumHeight(value)
+
+    def _toggle_preview_visibility(self, checked: bool):
+        self.preview_table.setVisible(checked)
+        self.preview_height_slider.setEnabled(checked)
+        self.preview_height_label.setEnabled(checked)
+        self.preview_toggle.setText(tr("Свернуть") if checked else tr("Показать"))
+        self.preview_height_label.setText(f"{self.preview_height_slider.value()} px" if checked else tr("Скрыто"))
+        if checked:
+            self._update_preview_height(self.preview_height_slider.value())
 
     def _column_letter(self, idx: int) -> str:
         idx += 1
