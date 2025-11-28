@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         self.main_screen = QWidget()
         main_layout = QVBoxLayout(self.main_screen)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addLayout(self._create_main_header())
         main_layout.addWidget(self.tab_widget)
 
         self.excel_builder_widget = ExcelBuilderTab()
@@ -166,6 +167,9 @@ class MainWindow(QMainWindow):
         self.builder_action.setText(self._get_builder_tab_text())
         self.builder_action.setIcon(self._get_settings_icon())
         self.builder_action.setToolTip(tr("Конструктор Excel"))
+        self.builder_menu_button.setText(self._get_builder_tab_text())
+        self.builder_menu_button.setIcon(self._get_settings_icon())
+        self.builder_menu_button.setToolTip(tr("Конструктор Excel"))
         self.back_button.setText(self._get_back_button_text())
 
     def init_menu(self):
@@ -203,6 +207,21 @@ class MainWindow(QMainWindow):
         self.about_action = about_action
         i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
+
+    def _create_main_header(self) -> QHBoxLayout:
+        header = QHBoxLayout()
+        header.setContentsMargins(8, 8, 8, 8)
+
+        header.addStretch()
+
+        self.builder_menu_button = QPushButton(self._get_builder_tab_text())
+        self.builder_menu_button.setIcon(self._get_settings_icon())
+        self.builder_menu_button.setFlat(True)
+        self.builder_menu_button.setCursor(Qt.PointingHandCursor)
+        self.builder_menu_button.clicked.connect(self.show_builder_page)
+        header.addWidget(self.builder_menu_button)
+
+        return header
 
     def _create_builder_page(self) -> QWidget:
         page = QWidget()
