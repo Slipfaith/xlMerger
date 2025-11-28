@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QProgressDialog,
     QScrollArea,
+    QSizePolicy,
 )
 
 from utils.i18n import tr
@@ -123,6 +124,8 @@ class ExcelBuilderTab(QWidget):
         self.preview_table = QTableWidget()
         self.preview_table.setRowCount(0)
         self.preview_table.setColumnCount(0)
+        self.preview_table.setMinimumHeight(320)
+        self.preview_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         vbox.addWidget(self.preview_table)
         return box
 
@@ -141,8 +144,9 @@ class ExcelBuilderTab(QWidget):
         # Header rename
         header_box = QGroupBox(tr("Редактирование заголовков"))
         header_layout = QHBoxLayout(header_box)
-        self.header_identifier = QLineEdit()
-        self.header_identifier.setPlaceholderText(tr("A или Текущий заголовок"))
+        self.header_identifier = QComboBox()
+        self.header_identifier.setEditable(True)
+        self.header_identifier.lineEdit().setPlaceholderText(tr("A или Текущий заголовок"))
         self.header_new_value = QLineEdit()
         self.header_new_value.setPlaceholderText(tr("Новый заголовок"))
         self.header_mode = QComboBox()
@@ -157,7 +161,11 @@ class ExcelBuilderTab(QWidget):
 
         # Fill cell
         fill_box = QGroupBox(tr("Заполнение значения"))
-        fill_layout = QHBoxLayout(fill_box)
+        fill_layout = QVBoxLayout(fill_box)
+        fill_description = QLabel(
+            tr("Позволяет задать конкретную ячейку и новое значение. Можно заполнить только пустые ячейки."),
+        )
+        fill_description.setWordWrap(True)
         self.fill_cell = QLineEdit()
         self.fill_cell.setPlaceholderText("C1")
         self.fill_value = QLineEdit()
@@ -165,17 +173,21 @@ class ExcelBuilderTab(QWidget):
         self.fill_only_empty = QCheckBox(tr("Только пустые"))
         fill_btn = QPushButton(tr("Добавить"))
         fill_btn.clicked.connect(self.add_fill_operation)
-        fill_layout.addWidget(self.fill_cell)
-        fill_layout.addWidget(self.fill_value)
-        fill_layout.addWidget(self.fill_only_empty)
-        fill_layout.addWidget(fill_btn)
+        fill_row = QHBoxLayout()
+        fill_row.addWidget(self.fill_cell)
+        fill_row.addWidget(self.fill_value)
+        fill_row.addWidget(self.fill_only_empty)
+        fill_row.addWidget(fill_btn)
+        fill_layout.addWidget(fill_description)
+        fill_layout.addLayout(fill_row)
         vbox.addWidget(fill_box)
 
         # Rename sheets
         sheet_box = QGroupBox(tr("Переименование листов"))
         sheet_layout = QHBoxLayout(sheet_box)
-        self.old_sheet = QLineEdit()
-        self.old_sheet.setPlaceholderText(tr("Старое имя"))
+        self.old_sheet = QComboBox()
+        self.old_sheet.setEditable(True)
+        self.old_sheet.lineEdit().setPlaceholderText(tr("Старое имя"))
         self.new_sheet = QLineEdit()
         self.new_sheet.setPlaceholderText(tr("Новое имя"))
         sheet_btn = QPushButton(tr("Добавить"))
@@ -188,8 +200,9 @@ class ExcelBuilderTab(QWidget):
         # Clear column
         clear_box = QGroupBox(tr("Очистка колонки"))
         clear_layout = QHBoxLayout(clear_box)
-        self.clear_identifier = QLineEdit()
-        self.clear_identifier.setPlaceholderText(tr("Буква или заголовок"))
+        self.clear_identifier = QComboBox()
+        self.clear_identifier.setEditable(True)
+        self.clear_identifier.lineEdit().setPlaceholderText(tr("Буква или заголовок"))
         self.clear_mode = QComboBox()
         self.clear_mode.addItems([tr("По букве"), tr("По тексту")])
         self.clear_format = QCheckBox(tr("Очистить формат"))
@@ -277,10 +290,11 @@ class ExcelBuilderTab(QWidget):
         if not file_info:
             self.preview_sheet_combo.blockSignals(False)
             self.preview_sheet_combo.clear()
-            self.preview_table.setRowCount(0)
-            self.preview_table.setColumnCount(0)
+            self._clear_preview_table()
+            self._update_sheet_suggestions([])
             return
         sheets = self._read_sheets(file_info["path"], preview=True)
+        self._update_sheet_suggestions(list(sheets.keys()))
         for name in sheets.keys():
             self.preview_sheet_combo.addItem(name)
         self.preview_sheet_combo.blockSignals(False)
@@ -290,12 +304,17 @@ class ExcelBuilderTab(QWidget):
         file_info = self.preview_file_combo.currentData()
         sheet_name = self.preview_sheet_combo.currentText()
         if not file_info or not sheet_name:
+            self._clear_preview_table()
             return
         sheets = self._read_sheets(file_info["path"], preview=True)
         if sheet_name not in sheets:
+            self._clear_preview_table()
             return
+        if sheet_name:
+            self.old_sheet.setCurrentText(sheet_name)
         df = sheets[sheet_name].head(30)
         self._populate_table(df)
+        self._update_header_suggestions(df)
 
     def _read_sheets(self, path: str, preview: bool = False) -> Dict[str, pd.DataFrame]:
         return self.executor.read_sheets(path, preview=preview)
@@ -311,6 +330,12 @@ class ExcelBuilderTab(QWidget):
                 self.preview_table.setItem(i, j, item)
         self.preview_table.resizeColumnsToContents()
 
+    def _clear_preview_table(self):
+        self.preview_table.clear()
+        self.preview_table.setRowCount(0)
+        self.preview_table.setColumnCount(0)
+        self._update_header_suggestions(pd.DataFrame())
+
     # region operation adders
     def _current_scope(self):
         data = self.scope_combo.currentData()
@@ -322,7 +347,7 @@ class ExcelBuilderTab(QWidget):
         return self.preview_sheet_combo.currentText()
 
     def add_header_operation(self):
-        identifier = self.header_identifier.text().strip()
+        identifier = self.header_identifier.currentText().strip()
         new_val = self.header_new_value.text().strip()
         if not identifier or not new_val:
             QMessageBox.warning(self, tr("Ошибка"), tr("Укажите колонку и новый заголовок"))
@@ -338,7 +363,7 @@ class ExcelBuilderTab(QWidget):
         }
         self.operations.append(operation)
         self._append_operation_item(tr("Заголовок"), operation)
-        self.header_identifier.clear()
+        self.header_identifier.setCurrentText("")
         self.header_new_value.clear()
 
     def add_fill_operation(self):
@@ -362,7 +387,7 @@ class ExcelBuilderTab(QWidget):
         self.fill_only_empty.setChecked(False)
 
     def add_sheet_rename_operation(self):
-        old = self.old_sheet.text().strip()
+        old = self.old_sheet.currentText().strip()
         new = self.new_sheet.text().strip()
         if not old or not new:
             QMessageBox.warning(self, tr("Ошибка"), tr("Укажите старое и новое имя"))
@@ -375,11 +400,11 @@ class ExcelBuilderTab(QWidget):
         }
         self.operations.append(operation)
         self._append_operation_item(tr("Лист"), operation)
-        self.old_sheet.clear()
+        self.old_sheet.setCurrentText("")
         self.new_sheet.clear()
 
     def add_clear_operation(self):
-        identifier = self.clear_identifier.text().strip()
+        identifier = self.clear_identifier.currentText().strip()
         if not identifier:
             QMessageBox.warning(self, tr("Ошибка"), tr("Укажите колонку"))
             return
@@ -394,7 +419,7 @@ class ExcelBuilderTab(QWidget):
         }
         self.operations.append(operation)
         self._append_operation_item(tr("Очистка"), operation)
-        self.clear_identifier.clear()
+        self.clear_identifier.setCurrentText("")
         self.clear_format.setChecked(False)
 
     def _append_operation_item(self, prefix: str, operation: Dict):
@@ -458,5 +483,50 @@ class ExcelBuilderTab(QWidget):
     def _log_line(self, text: str):
         logger.info(text)
         self.log_output.append(text)
+
+    def _update_sheet_suggestions(self, sheets: List[str]):
+        self.old_sheet.blockSignals(True)
+        self.old_sheet.clear()
+        for name in sheets:
+            self.old_sheet.addItem(name)
+        self.old_sheet.blockSignals(False)
+        if sheets:
+            preferred = self.preview_sheet_combo.currentText()
+            self.old_sheet.setCurrentText(preferred if preferred else sheets[0])
+
+    def _update_header_suggestions(self, df: pd.DataFrame):
+        header_row = self.header_spin.value() - 1
+        headers: List[str] = []
+        if header_row < len(df):
+            headers = [
+                str(val)
+                for val in df.iloc[header_row].tolist()
+                if pd.notna(val) and str(val)
+            ]
+        letters = [self._column_letter(idx) for idx in range(len(df.columns))]
+        combined = []
+        seen = set()
+        for value in letters + headers:
+            if value in seen:
+                continue
+            seen.add(value)
+            combined.append(value)
+
+        for combo in (self.header_identifier, self.clear_identifier):
+            combo.blockSignals(True)
+            text = combo.currentText()
+            combo.clear()
+            for item in combined:
+                combo.addItem(item)
+            combo.setCurrentText(text if text else (headers[0] if headers else (letters[0] if letters else "")))
+            combo.blockSignals(False)
+
+    def _column_letter(self, idx: int) -> str:
+        idx += 1
+        letters = ""
+        while idx > 0:
+            idx, remainder = divmod(idx - 1, 26)
+            letters = chr(65 + remainder) + letters
+        return letters
 
     # endregion
