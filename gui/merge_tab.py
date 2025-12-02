@@ -156,7 +156,12 @@ class MergeTab(QWidget):
         layout.addStretch()
 
     def handle_target_files_selected(self, files: List[str]):
-        self.target_files = files
+        combined = []
+        for path in [*self.target_files, *files]:
+            if path not in combined:
+                combined.append(path)
+        self.target_files = combined
+        self.target_files_input.setText('; '.join([self.target_files_input._short_name(f) for f in combined]))
 
     def handle_files_selected(self, files: List[str]):
         self.source_files = files
