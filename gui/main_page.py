@@ -14,6 +14,7 @@ class MainPageWidget(QWidget):
     folderSelected = Signal(str)
     filesSelected = Signal(list)
     excelFileSelected = Signal(str)
+    excelFilesSelected = Signal(list)
     processTriggered = Signal()
     previewTriggered = Signal()
 
@@ -53,9 +54,10 @@ class MainPageWidget(QWidget):
 
     def create_excel_selection_layout(self):
         layout = QHBoxLayout()
-        self.excel_file_entry = DragDropLineEdit(mode='file')
-        self.excel_file_entry.setPlaceholderText(tr("Перетащи или кликни дважды"))
+        self.excel_file_entry = DragDropLineEdit(mode='files_only')
+        self.excel_file_entry.setPlaceholderText(tr("Перетащи или кликни дважды (можно несколько)"))
         self.excel_file_entry.fileSelected.connect(self.excelFileSelected)
+        self.excel_file_entry.filesSelected.connect(self.excelFilesSelected)
         self.excel_label = QLabel()
         layout.addWidget(self.excel_label)
         layout.addWidget(self.excel_file_entry)
@@ -142,9 +144,9 @@ class MainPageWidget(QWidget):
 
     def retranslate_ui(self):
         self.folder_entry.setPlaceholderText(tr("Перетащи или кликни дважды"))
-        self.excel_file_entry.setPlaceholderText(tr("Перетащи или кликни дважды"))
+        self.excel_file_entry.setPlaceholderText(tr("Перетащи или кликни дважды (можно несколько)"))
         self.folder_label.setText(tr("Папка/эксели с переводами:"))
-        self.excel_label.setText(tr("Целевой Excel:"))
+        self.excel_label.setText(tr("Целевые Excel файлы:"))
         self.copy_column_label.setText(tr("Из какой колонки копировать? (буква колонки):"))
         self.skip_first_row_checkbox.setText(tr("Первая строка — заголовок в переводах"))
         self.copy_by_matching_radio.setText(tr("Нет пустых/скрытых строк в xlsx"))

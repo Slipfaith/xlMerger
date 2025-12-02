@@ -18,6 +18,7 @@ class MainPageLogic(QObject):
         self.folder_path = ''
         self.selected_files = []
         self.excel_file_path = ''
+        self.excel_file_paths = []
         self.sheet_names = []
         self.selected_sheets = []
         self.copy_column = ''
@@ -26,6 +27,7 @@ class MainPageLogic(QObject):
         self.ui.folderSelected.connect(self.on_folder_selected)
         self.ui.filesSelected.connect(self.on_files_selected)
         self.ui.excelFileSelected.connect(self.on_excel_file_selected)
+        self.ui.excelFilesSelected.connect(self.on_excel_files_selected)
         self.ui.processTriggered.connect(self.on_process_clicked)
         self.ui.previewTriggered.connect(self.on_preview_clicked)
 
@@ -45,7 +47,17 @@ class MainPageLogic(QObject):
 
     def on_excel_file_selected(self, file):
         self.excel_file_path = file
+        self.excel_file_paths = [file] if file else []
         self.ui.excel_file_entry.setText(file)
+        self.load_sheet_names()
+
+    def on_excel_files_selected(self, files):
+        self.excel_file_paths = list(files)
+        self.excel_file_path = self.excel_file_paths[0] if self.excel_file_paths else ''
+        if len(self.excel_file_paths) == 1:
+            self.ui.excel_file_entry.setText(files[0])
+        else:
+            self.ui.excel_file_entry.setText(tr("Выбрано файлов: {count}").format(count=len(self.excel_file_paths)))
         self.load_sheet_names()
 
     def load_sheet_names(self):
@@ -93,7 +105,10 @@ class MainPageLogic(QObject):
         self.folder_path = self.ui.folder_entry.text()
         self.copy_column = self.ui.copy_column_entry.text()
         self.selected_sheets = self.get_selected_sheets()
-        self.excel_file_path = self.ui.excel_file_entry.text()
+        if self.excel_file_paths:
+            self.excel_file_path = self.excel_file_paths[0]
+        else:
+            self.excel_file_path = self.ui.excel_file_entry.text()
 
         if not self.selected_files and self.folder_path and os.path.isdir(self.folder_path):
             self.selected_files = [
@@ -107,7 +122,7 @@ class MainPageLogic(QObject):
 
     def validate_inputs(self):
         folder_path = self.ui.folder_entry.text()
-        excel_file_path = self.ui.excel_file_entry.text()
+        excel_file_path = self.excel_file_paths[0] if self.excel_file_paths else self.ui.excel_file_entry.text()
         copy_column = self.ui.copy_column_entry.text()
         selected_sheets = self.get_selected_sheets()
 
@@ -119,8 +134,10 @@ class MainPageLogic(QObject):
         elif folder_path and not os.path.isdir(folder_path):
             QMessageBox.critical(self.ui, "Ошибка", "Указанная папка не существует.")
             return False
-        if not excel_file_path or not os.path.isfile(excel_file_path):
-            QMessageBox.critical(self.ui, "Ошибка", "Указанный файл Excel не существует.")
+        target_files = self.excel_file_paths or [excel_file_path]
+        missing = [f for f in target_files if not os.path.isfile(f)]
+        if missing:
+            QMessageBox.critical(self.ui, "Ошибка", tr("Указанный файл Excel не существует.") + f"\n{missing[0]}")
             return False
         if not copy_column:
             QMessageBox.critical(self.ui, "Ошибка", "Укажи столбец для копирования.")

@@ -47,6 +47,7 @@ class FileProcessorApp(QWidget):
         self.copy_column = ''
         self.selected_sheets = []
         self.excel_file_path = ''
+        self.excel_file_paths = []
         self.header_row = {}
         self.columns = {}
         self.sheet_to_column = {}
@@ -78,6 +79,7 @@ class FileProcessorApp(QWidget):
         self.copy_column = self.main_page_logic.copy_column.strip()
         self.selected_sheets = self.main_page_logic.get_selected_sheets()
         self.excel_file_path = self.main_page_logic.excel_file_path
+        self.excel_file_paths = self.main_page_logic.excel_file_paths or [self.excel_file_path]
         self.skip_first_row = self.page_main.skip_first_row_checkbox.isChecked()
         self.copy_by_row_number = self.page_main.copy_by_row_number_radio.isChecked()
 
@@ -301,38 +303,57 @@ class FileProcessorApp(QWidget):
             file_to_column = {os.path.basename(k): v for k, v in self.file_to_column.items()} if self.file_to_column else {}
             folder_to_column = {os.path.basename(k): v for k, v in self.folder_to_column.items()} if self.folder_to_column else {}
             folder_path = self.folder_path if folder_to_column else ''
+            for target in self.excel_file_paths:
+                sheet_names = ExcelProcessor.get_sheet_names(target)
+                for sheet in self.selected_sheets:
+                    if sheet not in sheet_names:
+                        raise Exception(tr("Лист {sheet} отсутствует в файле {file}.").format(sheet=sheet, file=target))
+            outputs = []
+            total_files = len(self.excel_file_paths)
 
-            processor = ExcelProcessor(
-                main_excel_path=self.excel_file_path,
-                folder_path=folder_path,
-                copy_column=self.copy_column,
-                selected_sheets=self.selected_sheets,
-                sheet_to_header_row=self.header_row,
-                sheet_to_column={k: v.text() if hasattr(v, "text") else v for k, v in self.sheet_to_column.items()},
-                file_to_column=file_to_column,
-                folder_to_column=folder_to_column,
-                file_to_sheet_map=self.file_to_sheet_map,
-                skip_first_row=self.skip_first_row,
-                copy_by_row_number=self.copy_by_row_number,
-                preserve_formatting=self.preserve_formatting
-            )
+            for idx, target_path in enumerate(self.excel_file_paths, start=1):
+                processor = ExcelProcessor(
+                    main_excel_path=target_path,
+                    folder_path=folder_path,
+                    copy_column=self.copy_column,
+                    selected_sheets=self.selected_sheets,
+                    sheet_to_header_row=self.header_row,
+                    sheet_to_column={k: v.text() if hasattr(v, "text") else v for k, v in self.sheet_to_column.items()},
+                    file_to_column=file_to_column,
+                    folder_to_column=folder_to_column,
+                    file_to_sheet_map=self.file_to_sheet_map,
+                    skip_first_row=self.skip_first_row,
+                    copy_by_row_number=self.copy_by_row_number,
+                    preserve_formatting=self.preserve_formatting
+                )
 
-            def progress_callback(progress, total):
-                if hasattr(self, 'progress_bar') and self.progress_bar:
-                    self.progress_bar.setMaximum(total)
-                    self.progress_bar.setValue(progress)
-                    QApplication.processEvents()
+                def progress_callback(progress, total, *, _idx=idx, _path=target_path):
+                    if hasattr(self, 'page_progress') and self.page_progress:
+                        self.page_progress.set_progress(
+                            progress,
+                            maximum=total,
+                            file_index=_idx,
+                            file_total=total_files,
+                            filename=os.path.basename(_path),
+                        )
+                        QApplication.processEvents()
 
-            output_file = processor.copy_data(progress_callback=progress_callback)
-            self.finalize_copying_process(output_file)
+                output_file = processor.copy_data(progress_callback=progress_callback)
+                outputs.append(output_file)
+
+            self.finalize_copying_process(outputs)
 
         except Exception as e:
             self.log_error(e)
             QMessageBox.critical(self, tr("Error"), tr("Произошла ошибка при запуске процесса копирования: {e}").format(e=e))
 
-    def finalize_copying_process(self, output_file):
+    def finalize_copying_process(self, output_files):
         self.go_to_completion_page()
-        QMessageBox.information(self, tr("Success"), tr("Файлы успешно сохранены как {output_file}.").format(output_file=output_file))
+        if isinstance(output_files, (list, tuple)):
+            message = "\n".join(output_files)
+        else:
+            message = str(output_files)
+        QMessageBox.information(self, tr("Success"), tr("Файлы успешно сохранены как {output_file}.").format(output_file=message))
 
     # === Error Logging & Center Window ===
     def log_error(self, error):

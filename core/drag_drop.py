@@ -11,7 +11,7 @@ class DragDropLineEdit(QLineEdit):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setReadOnly(True)
-        self.mode = mode  # 'files_or_folder' или 'file'
+        self.mode = mode  # 'files_or_folder', 'file' или 'files_only'
         self.setStyleSheet(
             """
             QLineEdit {
@@ -44,6 +44,14 @@ class DragDropLineEdit(QLineEdit):
             else:
                 self.clear()
 
+        # Для поля "Файл(ы) Excel" — только эксели, можно несколько
+        elif self.mode == 'files_only':
+            if files and not folders:
+                self.setText('; '.join([self._short_name(f) for f in files]))
+                self.filesSelected.emit(files)
+            else:
+                self.clear()
+
         # Для поля "Папка переводов" — либо папка, либо только эксели
         elif self.mode == 'files_or_folder':
             if files and not folders:
@@ -70,6 +78,15 @@ class DragDropLineEdit(QLineEdit):
                 if folder:
                     self.setText(folder)
                     self.folderSelected.emit(folder)
+        elif self.mode == 'files_only':
+            dlg = QFileDialog(self)
+            dlg.setFileMode(QFileDialog.ExistingFiles)
+            dlg.setNameFilter("Excel файлы (*.xlsx *.xls)")
+            if dlg.exec():
+                files = dlg.selectedFiles()
+                if files:
+                    self.setText('; '.join([self._short_name(f) for f in files]))
+                    self.filesSelected.emit(files)
         elif self.mode == 'file':
             file, _ = QFileDialog.getOpenFileName(self, "Выбери файл", '', "Excel файлы (*.xlsx *.xls)")
             if file:
