@@ -11,7 +11,7 @@ class DragDropLineEdit(QLineEdit):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setReadOnly(True)
-        self.mode = mode  # 'files_or_folder' или 'file'
+        self.mode = mode  # 'files_or_folder' или 'file' или 'files'
         self.setStyleSheet(
             """
             QLineEdit {
@@ -41,6 +41,14 @@ class DragDropLineEdit(QLineEdit):
             if len(files) == 1 and not folders:
                 self.setText(self._short_name(files[0]))
                 self.fileSelected.emit(files[0])
+            else:
+                self.clear()
+
+        # Для поля, принимающего только файлы (несколько)
+        elif self.mode == 'files':
+            if files and not folders:
+                self.setText('; '.join([self._short_name(f) for f in files]))
+                self.filesSelected.emit(files)
             else:
                 self.clear()
 
@@ -75,6 +83,15 @@ class DragDropLineEdit(QLineEdit):
             if file:
                 self.setText(self._short_name(file))
                 self.fileSelected.emit(file)
+        elif self.mode == 'files':
+            dlg = QFileDialog(self)
+            dlg.setFileMode(QFileDialog.ExistingFiles)
+            dlg.setNameFilter("Excel файлы (*.xlsx *.xls)")
+            if dlg.exec():
+                files = dlg.selectedFiles()
+                if files:
+                    self.setText('; '.join([self._short_name(f) for f in files]))
+                    self.filesSelected.emit(files)
 
     def _short_name(self, path, n=5):
         name = os.path.basename(path)

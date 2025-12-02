@@ -9,43 +9,50 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QLabel, QGroupBox, QProgressBar
 )
 
-from PySide6.QtCore import QTimer, Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
 from core.merge_columns import merge_excel_columns
-from .merge_mapping_dialog import MergeMappingDialog
+from .multi_merge_mapping_dialog import MultiMergeMappingDialog
 
 
 class MergeWorker(QThread):
-    finished = Signal(str)
+    finished = Signal(list)
     error = Signal(str)
     progress = Signal(int, str)
 
-    def __init__(self, main_file, mappings):
+    def __init__(self, tasks):
         super().__init__()
-        self.main_file = main_file
-        self.mappings = mappings
-        self.output_file = None
+        self.tasks = tasks
+        self.outputs = []
 
     def run(self):
         try:
-            self.progress.emit(1, tr("Подготовка файлов..."))
+            total_steps = sum(len(task.get("mappings", [])) for task in self.tasks) or 1
+            completed = 0
+            for idx_task, task in enumerate(self.tasks):
+                main_file = task.get("target")
+                mappings = task.get("mappings", [])
+                self.progress.emit(1, tr("Подготовка {file}").format(file=os.path.basename(main_file)))
 
-            def progress_callback(idx, total, mapping):
-                source_file = os.path.basename(mapping.get("source", ""))
-                target_sheet = mapping.get("target_sheet", "")
-                progress_percent = int((idx / total) * 99) + 1
-                message = tr("Обрабатывается файл: {file}, лист: {sheet}").format(
-                    file=source_file,
-                    sheet=target_sheet
-                )
-                self.progress.emit(progress_percent, message)
+                def progress_callback(idx, total, mapping):
+                    source_file = os.path.basename(mapping.get("source", ""))
+                    target_sheet = mapping.get("target_sheet", "")
+                    step = int(((completed + idx) / total_steps) * 99) + 1
+                    message = tr("{file}: лист {sheet}, источник {src}").format(
+                        file=os.path.basename(main_file),
+                        sheet=target_sheet,
+                        src=source_file
+                    )
+                    self.progress.emit(step, message)
 
-            self.output_file = merge_excel_columns(self.main_file, self.mappings, progress_callback=progress_callback)
+                output = merge_excel_columns(main_file, mappings, progress_callback=progress_callback)
+                completed += len(mappings)
+                self.outputs.append((main_file, output))
 
             self.progress.emit(100, tr("Объединение завершено!"))
-            self.finished.emit(self.output_file)
+            self.finished.emit(self.outputs)
 
         except Exception as e:
             self.error.emit(str(e))
@@ -55,8 +62,8 @@ class MergeTab(QWidget):
     def __init__(self):
         super().__init__()
         self.source_files: List[str] = []
-        self.main_file = ""
-        self.mappings = []
+        self.target_files: List[str] = []
+        self.merge_tasks = []
         self.is_processing = False
         self.worker = None
         self.init_ui()
@@ -71,10 +78,10 @@ class MergeTab(QWidget):
         main_group = QGroupBox()
         main_layout = QVBoxLayout()
         self.main_label = QLabel()
-        self.main_file_input = DragDropLineEdit(mode='file')
-        self.main_file_input.fileSelected.connect(self.handle_main_file_selected)
+        self.target_files_input = DragDropLineEdit(mode='files')
+        self.target_files_input.filesSelected.connect(self.handle_target_files_selected)
         main_layout.addWidget(self.main_label)
-        main_layout.addWidget(self.main_file_input)
+        main_layout.addWidget(self.target_files_input)
         main_group.setLayout(main_layout)
         layout.addWidget(main_group)
 
@@ -148,8 +155,8 @@ class MergeTab(QWidget):
         layout.addLayout(button_layout)
         layout.addStretch()
 
-    def handle_main_file_selected(self, file_path: str):
-        self.main_file = file_path
+    def handle_target_files_selected(self, files: List[str]):
+        self.target_files = files
 
     def handle_files_selected(self, files: List[str]):
         self.source_files = files
@@ -157,38 +164,38 @@ class MergeTab(QWidget):
     def handle_folder_selected(self, folder: str):
         excel_exts = ('.xlsx', '.xls')
         if os.path.isdir(folder):
-            self.source_files = [
-                os.path.join(folder, f)
-                for f in os.listdir(folder)
-                if f.lower().endswith(excel_exts)
-            ]
+            collected = []
+            for root, _, files in os.walk(folder):
+                for fname in files:
+                    if fname.lower().endswith(excel_exts):
+                        collected.append(os.path.join(root, fname))
+            self.source_files = collected
         else:
             self.source_files = []
 
     def open_preview(self):
-        if not self.main_file:
-            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи основной Excel."))
+        if not self.target_files:
+            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи целевые Excel файлы."))
             return
         if not self.source_files:
-            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи файлы источников."))
+            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи файлы или папки с переводами."))
             return
 
-        dialog = MergeMappingDialog(self.main_file, self)
-        for f in self.source_files:
-            dialog.add_row_with_file(f)
+        dialog = MultiMergeMappingDialog(self.target_files, self.source_files, self)
         if dialog.exec():
-            self.mappings = dialog.get_mappings()
-            self.merge_btn.setEnabled(True)
-            self.status_label.setText(tr("Настройки сохранены. Готово к объединению."))
+            self.merge_tasks = dialog.get_tasks()
+            if self.merge_tasks:
+                self.merge_btn.setEnabled(True)
+                self.status_label.setText(tr("Настройки сохранены. Готово к объединению."))
 
     def run_merge(self):
-        if not self.main_file:
-            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи основной Excel."))
+        if not self.target_files:
+            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи целевые Excel файлы."))
             return
         if not self.source_files:
-            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи файлы источников."))
+            QMessageBox.critical(self, tr("Ошибка"), tr("Укажи файлы или папки с переводами."))
             return
-        if not self.mappings:
+        if not self.merge_tasks:
             QMessageBox.warning(self, tr("Предупреждение"),
                                 tr("Сначала настройте сопоставления через кнопку Настроить."))
             return
@@ -206,7 +213,7 @@ class MergeTab(QWidget):
         self.progress_bar.setValue(0)
         self.status_label.setText(tr("Начинаем объединение..."))
 
-        self.worker = MergeWorker(self.main_file, self.mappings)
+        self.worker = MergeWorker(self.merge_tasks)
         self.worker.finished.connect(self.on_merge_finished)
         self.worker.error.connect(self.on_merge_error)
         self.worker.progress.connect(self.on_progress_update)
@@ -216,16 +223,20 @@ class MergeTab(QWidget):
         self.progress_bar.setValue(value)
         self.status_label.setText(message)
 
-    def on_merge_finished(self, output_file):
+    def on_merge_finished(self, outputs):
         self.worker = None
-        self.output_file = output_file
+        self.output_files = outputs
         self.progress_bar.setValue(100)
         self.status_label.setText(tr("Объединение завершено успешно!"))
         self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
 
-        filename = os.path.basename(output_file)
-        self.file_link.setText(f'<a href="file:///{output_file}">{filename}</a>')
-        self.file_link.setVisible(True)
+        links = []
+        for _, path in outputs:
+            filename = os.path.basename(path)
+            links.append(f'<a href="file:///{path}">{filename}</a>')
+        if links:
+            self.file_link.setText("<br>".join(links))
+            self.file_link.setVisible(True)
 
         self.is_processing = False
         self.merge_btn.setEnabled(True)
@@ -245,22 +256,23 @@ class MergeTab(QWidget):
         QMessageBox.critical(self, tr("Ошибка"), error_message)
 
     def open_file_location(self, link):
-        if hasattr(self, 'output_file'):
-            folder = os.path.dirname(self.output_file)
+        if hasattr(self, 'output_files') and self.output_files:
+            first_output = self.output_files[0][1]
+            folder = os.path.dirname(first_output)
             if platform.system() == 'Windows':
-                subprocess.run(['explorer', '/select,', os.path.normpath(self.output_file)])
+                subprocess.run(['explorer', '/select,', os.path.normpath(first_output)])
             elif platform.system() == 'Darwin':
-                subprocess.run(['open', '-R', self.output_file])
+                subprocess.run(['open', '-R', first_output])
             else:
                 subprocess.run(['xdg-open', folder])
 
     def retranslate_ui(self):
-        self.main_label.setText(tr("Основной Excel файл:"))
-        self.main_file_input.setPlaceholderText(tr("Перетащи или кликни дважды"))
+        self.main_label.setText(tr("Целевые Excel файлы:"))
+        self.target_files_input.setPlaceholderText(tr("Перетащи или кликни дважды"))
         self.sources_label.setText(tr("Файлы источников:"))
         self.sources_input.setPlaceholderText(tr("Перетащи или кликни дважды"))
         self.configure_btn.setText(tr("Настроить"))
         self.merge_btn.setText(tr("Объединить"))
 
-        if hasattr(self, 'status_label') and not self.mappings:
+        if hasattr(self, 'status_label') and not self.merge_tasks:
             self.status_label.setText(tr("Сначала настройте сопоставления"))
