@@ -32,6 +32,9 @@ class ExcelProcessor:
         self.header_row = {}
 
         self.logger = logger or Logger()
+        self.copy_attempts = 0
+        self.copy_successes = 0
+        self.copy_failures = []
 
     @staticmethod
     def get_sheet_names(excel_path):
@@ -115,6 +118,13 @@ class ExcelProcessor:
         output_file = f"{base}_out{ext}"
         self.workbook.save(output_file)
         self.logger.log_info(f"Файл успешно сохранён: {output_file}")
+        report_file = self._write_copy_report(output_file)
+        self.logger.log_info(
+            f"Итог копирования: всего={self.copy_attempts}, "
+            f"успешно={self.copy_successes}, ошибок={len(self.copy_failures)}"
+        )
+        if report_file:
+            self.logger.log_info(f"Отчёт сохранён: {report_file}")
         self.logger.save()
         self.workbook.close()
         return output_file
@@ -162,10 +172,21 @@ class ExcelProcessor:
             source_value = lang_sheet.cell(row=row, column=copy_col_index).value
             if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
                 continue
+            self.copy_attempts += 1
             data_index = row - data_start_row
             target_row = header_row + 2 + data_index
             source_cell = lang_sheet.cell(row=row, column=copy_col_index)
-            self._set_cell(sheet_name, target_row, col_index, source_value, source_cell)
+            if self._set_cell(sheet_name, target_row, col_index, source_value, source_cell):
+                self.copy_successes += 1
+            else:
+                self.copy_failures.append(
+                    {
+                        "sheet": sheet_name,
+                        "row": target_row,
+                        "col": col_index,
+                        "value": source_value,
+                    }
+                )
 
     def _set_cell(self, sheet_name, target_row, col_index, value, source_cell=None):
         target_cell = self.workbook[sheet_name].cell(row=target_row, column=col_index)
@@ -187,8 +208,27 @@ class ExcelProcessor:
             if value == target_cell.value and compute_hash(target_cell.value) == source_hash:
                 # Успешно скопировано — логируем
                 self.logger.log_copy(sheet_name, target_row, col_index, value)
-                break
+                return True
         else:
             fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
             target_cell.fill = fill
             self.logger.log_error(f"Не удалось записать значение после {max_attempts} попыток", "", "", f"{sheet_name}: R{target_row} C{col_index} [{value}]")
+        return False
+
+    def _write_copy_report(self, output_file):
+        if self.copy_attempts == 0:
+            return None
+        base, _ = os.path.splitext(output_file)
+        report_file = f"{base}_copy_report.txt"
+        with open(report_file, "w", encoding="utf-8") as report:
+            report.write("Отчёт о копировании\n")
+            report.write(f"Всего попыток: {self.copy_attempts}\n")
+            report.write(f"Успешно: {self.copy_successes}\n")
+            report.write(f"Ошибки: {len(self.copy_failures)}\n")
+            if self.copy_failures:
+                report.write("\nСписок ошибок:\n")
+                for failure in self.copy_failures:
+                    report.write(
+                        f"{failure['sheet']} R{failure['row']}C{failure['col']} -> {failure['value']!r}\n"
+                    )
+        return report_file
