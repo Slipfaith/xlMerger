@@ -72,8 +72,6 @@ class ExcelFileSelector(QDialog):
                 for file in files
                 if file.lower().endswith(('.xlsx', '.xls'))
             ]
-        if self.target_excel:
-            files = [f for f in files if os.path.abspath(f) != os.path.abspath(self.target_excel)]
         return sorted(files)
 
     def add_file_to_list(self, file_path):
