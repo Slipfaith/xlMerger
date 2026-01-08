@@ -96,7 +96,9 @@ class ExcelProcessor:
 
                 col_index = self.columns[sheet_name].index(column_name) + 1
                 if is_file_mapping:
-                    file_path = os.path.join(self.folder_path, name)
+                    file_path = name
+                    if not os.path.isabs(file_path) and self.folder_path:
+                        file_path = os.path.join(self.folder_path, name)
                     self.logger.log_info(f"Копирование из файла: {file_path}, лист: {sheet_name}, столбец: {column_name}")
                     self._copy_from_file(
                         file_path, sheet_name, copy_col_index, header_row, col_index
@@ -121,7 +123,12 @@ class ExcelProcessor:
 
     def _find_matching_sheet(self, lang_wb, main_sheet_name, file_path=None):
         if file_path:
-            mapping = self.file_to_sheet_map.get(file_path, {}).get(main_sheet_name)
+            lookup_keys = [file_path, os.path.abspath(file_path), os.path.basename(file_path)]
+            mapping = None
+            for key in lookup_keys:
+                mapping = self.file_to_sheet_map.get(key, {}).get(main_sheet_name)
+                if mapping:
+                    break
             if mapping and mapping in lang_wb.sheetnames:
                 return mapping
         if main_sheet_name in lang_wb.sheetnames:
