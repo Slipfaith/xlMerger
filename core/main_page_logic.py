@@ -110,11 +110,12 @@ class MainPageLogic(QObject):
                         QMessageBox.critical(self.ui, "Ошибка", "Не удалось открыть окно превью.")
                         return
                     self.preview_window = preview_window
-                    self.preview_window.destroyed.connect(self._clear_preview_window)
+                    preview_window.destroyed.connect(self._clear_preview_window)
                     self.preview_window.show()
 
-    def _clear_preview_window(self):
-        self.preview_window = None
+    def _clear_preview_window(self, destroyed_obj=None):
+        if destroyed_obj is None or destroyed_obj == self.preview_window:
+            self.preview_window = None
 
     def update_process_button_state(self):
         source_files = self._collect_source_files()
