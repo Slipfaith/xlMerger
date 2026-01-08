@@ -39,7 +39,6 @@ class FileProcessorApp(QWidget):
         self.main_page_logic = MainPageLogic(self.page_main)
         self.stack.addWidget(self.page_main)
         self.page_main.processTriggered.connect(self.process_files)
-        self.page_main.previewTriggered.connect(self.preview_excel)
 
         # Переменные этапов
         self.selected_files = []
@@ -73,6 +72,11 @@ class FileProcessorApp(QWidget):
         self.retranslate_ui()
 
     def process_files(self):
+        self.main_page_logic.folder_path = self.page_main.folder_entry.text()
+        self.main_page_logic.excel_file_path = self.page_main.excel_file_entry.text()
+        self.main_page_logic.copy_column = self.page_main.copy_column_entry.text()
+        if not self.main_page_logic.validate_inputs():
+            return
         self.selected_files = self.main_page_logic.selected_files
         self.folder_path = self.main_page_logic.folder_path
         self.copy_column = self.main_page_logic.copy_column.strip()
@@ -81,17 +85,10 @@ class FileProcessorApp(QWidget):
         self.skip_first_row = self.page_main.skip_first_row_checkbox.isChecked()
         self.copy_by_row_number = self.page_main.copy_by_row_number_radio.isChecked()
 
-        if not self.copy_column:
-            QMessageBox.warning(self, tr("Error"), tr("Укажи столбец для копирования."))
-            return  # НЕ переходим дальше
-
         if not self.check_sheet_mapping():
             return
 
         self.go_to_header_page()
-
-    def preview_excel(self):
-        self.main_page_logic.on_preview_clicked()
 
     # === Header Page ===
     def go_to_header_page(self):

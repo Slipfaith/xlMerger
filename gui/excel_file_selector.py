@@ -6,26 +6,39 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 class ExcelFileSelector(QDialog):
-    def __init__(self, folder_path, selected_files=None):
+    def __init__(self, folder_path, selected_files=None, target_excel=None):
         super().__init__()
         self.folder_path = folder_path
-        self.selected_files = selected_files
+        self.selected_files = selected_files or []
+        self.target_excel = target_excel
         self.selected_file = None
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle(self.tr("Выберите файл Excel"))
+        self.setWindowTitle(self.tr("Превью Excel"))
         layout = QVBoxLayout()
 
+        layout.addWidget(self.create_target_label())
+        layout.addWidget(QLabel(self.tr("Загруженные Excel-файлы:")))
         self.file_list = self.create_file_list_widget()
-        layout.addWidget(QLabel(self.tr("Дважды щелкните, чтобы выбрать файл Excel:")))
         layout.addWidget(self.file_list)
+        layout.addWidget(QLabel(self.tr("Дважды щелкните, чтобы выбрать файл Excel:")))
 
         self.load_excel_files()
 
         self.setLayout(layout)
         self.setGeometry(300, 300, 400, 300)
-        self.show()
+        self.setModal(True)
+
+    def create_target_label(self):
+        target_label = QLabel(self)
+        target_name = self.tr("(не выбрано)")
+        if self.target_excel:
+            target_name = os.path.basename(self.target_excel)
+        target_label.setText(f"{self.tr('Целевой Excel:')} {target_name}")
+        if self.target_excel:
+            target_label.setToolTip(self.target_excel)
+        return target_label
 
     def create_file_list_widget(self):
         """Создание QListWidget для отображения файлов."""
@@ -45,12 +58,23 @@ class ExcelFileSelector(QDialog):
 
     def get_excel_files(self):
         """Возвращает список файлов Excel в папке."""
-        return [
-            os.path.join(root, file)
-            for root, _, files in os.walk(self.folder_path)
-            for file in files if file.endswith(('.xlsx', '.xls')) and
-                                 (not self.selected_files or file in self.selected_files)
-        ]
+        if self.selected_files:
+            files = [
+                f for f in self.selected_files
+                if os.path.isfile(f) and f.lower().endswith(('.xlsx', '.xls'))
+            ]
+        elif self.folder_path and os.path.isfile(self.folder_path):
+            files = [self.folder_path] if self.folder_path.lower().endswith(('.xlsx', '.xls')) else []
+        else:
+            files = [
+                os.path.join(root, file)
+                for root, _, files in os.walk(self.folder_path)
+                for file in files
+                if file.lower().endswith(('.xlsx', '.xls'))
+            ]
+        if self.target_excel:
+            files = [f for f in files if os.path.abspath(f) != os.path.abspath(self.target_excel)]
+        return sorted(files)
 
     def add_file_to_list(self, file_path):
         """Добавление файла в QListWidget."""
