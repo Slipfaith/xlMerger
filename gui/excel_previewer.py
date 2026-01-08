@@ -30,16 +30,21 @@ class ClickableHeaderView(QHeaderView):
 class ExcelPreviewer(QWidget):
     def __init__(self, excel_path):
         super().__init__()
-        self.excel_path = excel_path
-        self.workbook = load_workbook(excel_path, read_only=True)
-        self.sheet_names = self.workbook.sheetnames
-        self.current_sheet = self.sheet_names[0]
+        self.excel_path = None
+        self.workbook = None
+        self.sheet_names = []
+        self.current_sheet = None
         self.source_col = None
         self.target_cols = set()
         self.init_ui()
+        self.load_file(excel_path)
+
+    def closeEvent(self, event):
+        if self.workbook:
+            self.workbook.close()
+        super().closeEvent(event)
 
     def init_ui(self):
-        self.setWindowTitle(self.tr("Просмотр: ") + self.current_sheet)
         layout = QVBoxLayout()
 
         self.select_all_checkbox = QCheckBox(self.tr("Выбрать все листы"))
@@ -56,17 +61,34 @@ class ExcelPreviewer(QWidget):
         self.table_view.setHorizontalHeader(header)
         layout.addWidget(self.table_view)
 
-        self.load_excel_data()
-
         self.setLayout(layout)
         self.setGeometry(100, 100, 800, 600)
         self.show()
 
+    def load_file(self, excel_path):
+        if self.workbook:
+            self.workbook.close()
+        self.excel_path = excel_path
+        self.workbook = load_workbook(excel_path, read_only=True)
+        self.sheet_names = self.workbook.sheetnames
+        self.current_sheet = self.sheet_names[0] if self.sheet_names else ""
+        self.source_col = None
+        self.target_cols.clear()
+        self.init_sheet_selector()
+        self.setWindowTitle(self.tr("Просмотр: ") + self.current_sheet)
+        self.load_excel_data()
+
     def init_sheet_selector(self):
-        self.sheet_selector = QComboBox(self)
+        if not hasattr(self, "sheet_selector"):
+            self.sheet_selector = QComboBox(self)
+            self.sheet_selector.currentTextChanged.connect(self.switch_sheet)
+        self.sheet_selector.blockSignals(True)
+        self.sheet_selector.clear()
         self.sheet_selector.addItems(self.sheet_names)
-        self.sheet_selector.currentTextChanged.connect(self.switch_sheet)
-        self.sheet_selector.setEnabled(False)
+        self.sheet_selector.setEnabled(self.select_all_checkbox.isChecked())
+        if self.current_sheet:
+            self.sheet_selector.setCurrentText(self.current_sheet)
+        self.sheet_selector.blockSignals(False)
 
     def toggle_all_sheets(self, checked):
         self.sheet_selector.setEnabled(checked)
@@ -188,4 +210,3 @@ class ExcelPreviewer(QWidget):
             for row in range(model.rowCount()):
                 idx = model.index(row, col)
                 model.setData(idx, QBrush(QColor("#b6fcb6")), Qt.BackgroundRole)
-

@@ -21,32 +21,41 @@ class MainPageLogic(QObject):
         self.sheet_names = []
         self.selected_sheets = []
         self.copy_column = ''
+        self.preview_window = None
 
         # Подключаем сигналы UI к логике
         self.ui.folderSelected.connect(self.on_folder_selected)
         self.ui.filesSelected.connect(self.on_files_selected)
         self.ui.excelFileSelected.connect(self.on_excel_file_selected)
-        self.ui.processTriggered.connect(self.on_process_clicked)
         self.ui.previewTriggered.connect(self.on_preview_clicked)
+        self.ui.copy_column_entry.textChanged.connect(self.on_copy_column_changed)
 
         self.ui.sheet_list.clear()
+        self.update_process_button_state()
 
     def on_folder_selected(self, path):
         self.folder_path = path
         self.selected_files = []  # Очищаем только список выбранных файлов
         self.ui.folder_entry.setText(path)
+        self.update_process_button_state()
         # Больше ничего не сбрасываем!
 
     def on_files_selected(self, files):
         self.selected_files = files
         self.folder_path = os.path.dirname(files[0]) if files else ''
         self.ui.folder_entry.setText(self.folder_path)
+        self.update_process_button_state()
         # Больше ничего не сбрасываем!
 
     def on_excel_file_selected(self, file):
         self.excel_file_path = file
         self.ui.excel_file_entry.setText(file)
         self.load_sheet_names()
+        self.update_process_button_state()
+
+    def on_copy_column_changed(self, text):
+        self.copy_column = text
+        self.update_process_button_state()
 
     def load_sheet_names(self):
         try:
@@ -79,31 +88,52 @@ class MainPageLogic(QObject):
         ]
 
     def on_preview_clicked(self):
-        if not self.folder_path and not self.selected_files:
+        available_files = self._collect_source_files()
+        if not available_files:
             QMessageBox.warning(self.ui, "Предупреждение", "Сначала выбери папку или эксели с переводами.")
             return
-        dialog = ExcelFileSelector(self.folder_path, self.selected_files)
+        dialog = ExcelFileSelector(
+            self.folder_path,
+            selected_files=self.selected_files,
+            target_excel=self.excel_file_path,
+        )
         if dialog.exec():
             selected_file = dialog.selected_file
             if selected_file:
-                self.preview_window = ExcelPreviewer(selected_file)
-                self.preview_window.show()
+                if self.preview_window and self.preview_window.isVisible():
+                    self.preview_window.load_file(selected_file)
+                    self.preview_window.activateWindow()
+                    self.preview_window.raise_()
+                else:
+                    self.preview_window = ExcelPreviewer(selected_file)
+                    self.preview_window.destroyed.connect(self._clear_preview_window)
+                    self.preview_window.show()
 
-    def on_process_clicked(self):
-        self.folder_path = self.ui.folder_entry.text()
-        self.copy_column = self.ui.copy_column_entry.text()
-        self.selected_sheets = self.get_selected_sheets()
-        self.excel_file_path = self.ui.excel_file_entry.text()
+    def _clear_preview_window(self):
+        self.preview_window = None
 
-        if not self.selected_files and self.folder_path and os.path.isdir(self.folder_path):
-            self.selected_files = [
-                os.path.join(self.folder_path, fname)
-                for fname in os.listdir(self.folder_path)
+    def update_process_button_state(self):
+        source_files = self._collect_source_files()
+        copy_column = self.ui.copy_column_entry.text().strip()
+        target_excel = self.ui.excel_file_entry.text().strip()
+        target_ok = bool(target_excel) and os.path.isfile(target_excel)
+        can_start = bool(source_files) and bool(copy_column) and target_ok
+        self.ui.process_button.setEnabled(can_start)
+
+    def _collect_source_files(self):
+        if self.selected_files:
+            return [
+                f for f in self.selected_files
+                if os.path.isfile(f) and f.lower().endswith(('.xlsx', '.xls'))
+            ]
+        if self.folder_path and os.path.isdir(self.folder_path):
+            return [
+                os.path.join(root, fname)
+                for root, _, files in os.walk(self.folder_path)
+                for fname in files
                 if fname.lower().endswith(('.xlsx', '.xls'))
             ]
-        if not self.validate_inputs():
-            return
-        self.proceed_to_next.emit()  # Сигнализируем, что всё готово — пора переходить!
+        return []
 
     def validate_inputs(self):
         folder_path = self.ui.folder_entry.text()
@@ -119,6 +149,13 @@ class MainPageLogic(QObject):
         elif folder_path and not os.path.isdir(folder_path):
             QMessageBox.critical(self.ui, "Ошибка", "Указанная папка не существует.")
             return False
+        elif not self.selected_files and folder_path and os.path.isdir(folder_path):
+            self.selected_files = [
+                os.path.join(root, fname)
+                for root, _, files in os.walk(folder_path)
+                for fname in files
+                if fname.lower().endswith(('.xlsx', '.xls'))
+            ]
         if not excel_file_path or not os.path.isfile(excel_file_path):
             QMessageBox.critical(self.ui, "Ошибка", "Указанный файл Excel не существует.")
             return False
