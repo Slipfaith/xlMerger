@@ -105,7 +105,11 @@ class MainPageLogic(QObject):
                     self.preview_window.activateWindow()
                     self.preview_window.raise_()
                 else:
-                    self.preview_window = ExcelPreviewer(selected_file)
+                    preview_window = ExcelPreviewer(selected_file)
+                    if preview_window is None:
+                        QMessageBox.critical(self.ui, "Ошибка", "Не удалось открыть окно превью.")
+                        return
+                    self.preview_window = preview_window
                     self.preview_window.destroyed.connect(self._clear_preview_window)
                     self.preview_window.show()
 

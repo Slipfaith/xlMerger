@@ -18,7 +18,6 @@ class ExcelFileSelector(QDialog):
         self.setWindowTitle(self.tr("Превью Excel"))
         layout = QVBoxLayout()
 
-        layout.addWidget(self.create_target_label())
         layout.addWidget(QLabel(self.tr("Загруженные Excel-файлы:")))
         self.file_list = self.create_file_list_widget()
         layout.addWidget(self.file_list)
@@ -29,16 +28,6 @@ class ExcelFileSelector(QDialog):
         self.setLayout(layout)
         self.setGeometry(300, 300, 400, 300)
         self.setModal(True)
-
-    def create_target_label(self):
-        target_label = QLabel(self)
-        target_name = self.tr("(не выбрано)")
-        if self.target_excel:
-            target_name = os.path.basename(self.target_excel)
-        target_label.setText(f"{self.tr('Целевой Excel:')} {target_name}")
-        if self.target_excel:
-            target_label.setToolTip(self.target_excel)
-        return target_label
 
     def create_file_list_widget(self):
         """Создание QListWidget для отображения файлов."""
