@@ -11,7 +11,7 @@ __pycache__/
 *.log
 *.out
 *.bak
-error_log.txt
+*.txt
 
 # Env & config
 .env
