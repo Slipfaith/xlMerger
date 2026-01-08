@@ -298,7 +298,7 @@ class FileProcessorApp(QWidget):
         try:
             self.collect_confirmation_changes()
             self.go_to_progress_page()
-            file_to_column = {os.path.basename(k): v for k, v in self.file_to_column.items()} if self.file_to_column else {}
+            file_to_column = self.file_to_column if self.file_to_column else {}
             folder_to_column = {os.path.basename(k): v for k, v in self.folder_to_column.items()} if self.folder_to_column else {}
             folder_path = self.folder_path if folder_to_column else ''
 
