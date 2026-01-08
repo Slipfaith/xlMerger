@@ -28,7 +28,8 @@ class MainPageLogic(QObject):
         self.ui.filesSelected.connect(self.on_files_selected)
         self.ui.excelFileSelected.connect(self.on_excel_file_selected)
         self.ui.previewTriggered.connect(self.on_preview_clicked)
-        self.ui.copy_column_entry.textChanged.connect(self.on_copy_column_changed)
+        if hasattr(self.ui.copy_column_entry, "textChanged"):
+            self.ui.copy_column_entry.textChanged.connect(self.on_copy_column_changed)
 
         self.ui.sheet_list.clear()
         self.update_process_button_state()
