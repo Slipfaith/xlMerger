@@ -50,10 +50,19 @@ class ExcelFileSelector(QDialog):
     def load_excel_files(self):
         """Загрузка и отображение файлов Excel из папки."""
         excel_files = self.get_excel_files()
-        if not excel_files:
+        target_path = self._get_target_path()
+        if not excel_files and not target_path:
             self.show_warning_no_files()
             self.close()
+            return
+        if target_path:
+            self.add_file_to_list(
+                target_path,
+                display_name=self._format_target_name(target_path),
+            )
         for file_path in excel_files:
+            if target_path and self._normalize_path(file_path) == self._normalize_path(target_path):
+                continue
             self.add_file_to_list(file_path)
 
     def get_excel_files(self):
@@ -74,12 +83,12 @@ class ExcelFileSelector(QDialog):
             ]
         return sorted(files)
 
-    def add_file_to_list(self, file_path):
+    def add_file_to_list(self, file_path, display_name=None):
         """Добавление файла в QListWidget."""
-        file_name = os.path.basename(file_path)
+        file_name = display_name or os.path.basename(file_path)
         item = QListWidgetItem(file_name)
         item.setData(Qt.UserRole, file_path)
-        item.setToolTip(file_name)
+        item.setToolTip(file_path)
         self.file_list.addItem(item)
 
     def show_warning_no_files(self):
@@ -90,3 +99,14 @@ class ExcelFileSelector(QDialog):
         """Выбор файла из списка."""
         self.selected_file = item.data(Qt.UserRole)
         self.accept()
+
+    def _get_target_path(self):
+        if self.target_excel and os.path.isfile(self.target_excel):
+            return self.target_excel
+        return None
+
+    def _format_target_name(self, path):
+        return f"{os.path.basename(path)} ({self.tr('целевой')})"
+
+    def _normalize_path(self, path):
+        return os.path.normcase(os.path.abspath(path))
