@@ -1,20 +1,18 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QFileDialog,
     QLabel, QComboBox, QMessageBox, QScrollArea, QFrame, QGridLayout,
-    QLineEdit, QRadioButton, QButtonGroup, QSpacerItem, QSizePolicy, QTabWidget
+    QLineEdit, QRadioButton, QButtonGroup
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 import os
-from utils.i18n import tr
 
 try:
     import openpyxl
-    from openpyxl.utils import get_column_letter, column_index_from_string
+    from openpyxl.utils import get_column_letter
 except ImportError:
     openpyxl = None
     get_column_letter = None
-    column_index_from_string = None
 try:
     import xlrd
 except ImportError:
@@ -580,53 +578,6 @@ class MergeMappingDialog(QDialog):
                     settings['mappings'].append((src_text, tgt_text))
 
         return settings if settings['mappings'] else None
-
-    def apply_settings_to_card(self, card, settings):
-        # Устанавливаем режим
-        if settings['mode'] == 'letter':
-            card.letter_mode.setChecked(True)
-        else:
-            card.header_mode.setChecked(True)
-
-        # Устанавливаем целевой лист
-        target_idx = card.target_sheet_combo.findText(settings['target_sheet'])
-        if target_idx >= 0:
-            card.target_sheet_combo.setCurrentIndex(target_idx)
-
-        # Пересоздаем интерфейс сопоставления
-        card.create_mapping_interface()
-
-        # Применяем сопоставления
-        if settings['mode'] == 'letter':
-            # Очищаем текущие сопоставления
-            for source_edit, target_edit, remove_btn in card.letter_mappings[1:]:
-                source_edit.setParent(None)
-                target_edit.setParent(None)
-                remove_btn.setParent(None)
-            card.letter_mappings = card.letter_mappings[:1]
-
-            # Применяем новые
-            for i, (src_text, tgt_text) in enumerate(settings['mappings']):
-                if i == 0 and card.letter_mappings:
-                    # Используем первую существующую строку
-                    card.letter_mappings[0][0].setText(src_text)
-                    card.letter_mappings[0][1].setText(tgt_text)
-                else:
-                    # Добавляем новые строки
-                    grid = card.mapping_widget.layout().itemAt(0).widget().layout().itemAt(1).layout()
-                    card.add_letter_mapping_row(grid, len(card.letter_mappings) + 1)
-                    card.letter_mappings[-1][0].setText(src_text)
-                    card.letter_mappings[-1][1].setText(tgt_text)
-        else:
-            # Для режима заголовков
-            source_headers = card.file_structure.get(card.source_sheet_combo.currentText(), [])
-            target_headers = card.main_structure.get(card.target_sheet_combo.currentText(), [])
-
-            # Очищаем текущие сопоставления
-            for source_combo, target_combo, remove_btn in card.header_mappings[1:]:
-                source_combo.setParent(None)
-                target_combo.setParent(None)
-                remove_btn.setParent(None)
 
     def apply_settings_to_card(self, card, settings):
         # Устанавливаем режим

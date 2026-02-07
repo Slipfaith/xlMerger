@@ -2,7 +2,6 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QGridLayout, QLabel, QComboBox,
     QPushButton, QHBoxLayout
 )
-from PySide6.QtCore import Qt
 from utils.i18n import tr
 import os
 

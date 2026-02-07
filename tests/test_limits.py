@@ -1,6 +1,4 @@
-import pytest
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill
 
 from core.limit_auto import check_limits_auto
 from core.limit_manual import check_limits_manual

@@ -4,7 +4,7 @@ import traceback
 import pandas as pd
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QComboBox, QTableView, QMessageBox,
-    QHeaderView, QCheckBox, QMenu
+    QHeaderView, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush

@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
-from core.split_excel import split_excel_by_languages, split_excel_multiple_sheets
+from core.split_excel import split_excel_multiple_sheets
 from gui.split_mapping_dialog import SplitMappingDialog
 from openpyxl import load_workbook
 

@@ -6,7 +6,7 @@ import subprocess
 import platform
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QLabel, QGroupBox, QProgressBar
+    QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QGroupBox, QProgressBar
 )
 
 from PySide6.QtCore import Qt, QThread, Signal
