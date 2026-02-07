@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Excel builder tool package."""
 
 __all__ = ["ExcelFilesManager", "ExcelBuilderExecutor"]

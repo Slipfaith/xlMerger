@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from typing import Dict, List
 
@@ -34,6 +35,7 @@ from utils.i18n import i18n
 from utils.logger import logger
 from core.drag_drop import DragDropLineEdit
 from excel_builder import ExcelBuilderExecutor, ExcelFilesManager
+from .style_system import set_button_variant
 
 
 class ExcelBuilderTab(QWidget):
@@ -258,6 +260,8 @@ class ExcelBuilderTab(QWidget):
 
         btn_row = QHBoxLayout()
         self.execute_btn = QPushButton()
+        set_button_variant(self.execute_btn, "orange")
+        self.execute_btn.setEnabled(False)
         self.execute_btn.clicked.connect(self.execute)
         btn_row.addWidget(self.execute_btn)
         btn_row.addStretch()
@@ -383,6 +387,7 @@ class ExcelBuilderTab(QWidget):
         self.scope_combo.blockSignals(False)
         self._on_preview_file_changed()
         self._update_list_rows(self.file_list, self.file_list.count(), max_rows=5)
+        self.execute_btn.setEnabled(bool(self.manager.files))
 
     def remove_selected_files(self):
         rows = sorted({index.row() for index in self.file_list.selectedIndexes()}, reverse=True)

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from openpyxl import Workbook, load_workbook
 from core.split_excel import (
     split_excel_by_languages,

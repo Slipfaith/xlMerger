@@ -1,9 +1,11 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton,
     QTableWidget, QHeaderView, QComboBox, QCheckBox, QTableWidgetItem
 )
 from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
+from ..style_system import set_button_variant, set_label_state
 
 class ConfirmPage(QWidget):
     backClicked = Signal()
@@ -26,9 +28,9 @@ class ConfirmPage(QWidget):
         summary = f"Всего: {total}. Сопоставлено: {total - missing}. Не выбрано: {missing}."
         self.summary_label = QLabel(summary)
         if missing:
-            self.summary_label.setStyleSheet("color: #b91c1c; font-weight: 500;")
+            set_label_state(self.summary_label, "error")
         else:
-            self.summary_label.setStyleSheet("color: #15803d; font-weight: 500;")
+            set_label_state(self.summary_label, "success")
         layout.addWidget(self.summary_label)
 
         # Таблица сопоставлений
@@ -39,16 +41,6 @@ class ConfirmPage(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.NoSelection)
         self.table.setFocusPolicy(Qt.NoFocus)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                border: none;
-                font-size: 14px;
-            }
-            QTableWidget::item {
-                padding: 6px;
-            }
-        """)
-
         for row, (name, col_name) in enumerate(self.items):
             # Короткое имя + тултип
             short = name
@@ -70,7 +62,6 @@ class ConfirmPage(QWidget):
 
         self.format_checkbox = QCheckBox(tr("Копировать с сохранением форматирования"))
         self.format_checkbox.setChecked(self._preserve_formatting)
-        self.format_checkbox.setStyleSheet("QCheckBox { padding: 4px; }")
         layout.addWidget(self.format_checkbox)
 
         # Кнопки
@@ -85,6 +76,8 @@ class ConfirmPage(QWidget):
         self.btn_back.setMinimumWidth(max_width)
         self.btn_start.setMinimumWidth(max_width)
 
+        set_button_variant(self.btn_back, "secondary")
+        set_button_variant(self.btn_start, "orange")
         self.btn_back.clicked.connect(self.backClicked.emit)
         self.btn_start.clicked.connect(self.startClicked.emit)
         self.btn_start.setEnabled(True)

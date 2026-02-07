@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from typing import List
@@ -6,15 +7,16 @@ import subprocess
 import platform
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel, QGroupBox, QProgressBar
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QLabel, QGroupBox, QProgressBar
 )
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QUrl
 
 from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
 from core.merge_columns import merge_excel_columns
 from .multi_merge_mapping_dialog import MultiMergeMappingDialog
+from .style_system import set_button_variant, set_label_role, set_label_state
 
 
 class MergeWorker(QThread):
@@ -97,14 +99,12 @@ class MergeTab(QWidget):
         layout.addWidget(sources_group)
 
         button_layout = QVBoxLayout()
-        button_layout.addStretch()
 
         self.configure_btn = QPushButton()
         self.configure_btn.clicked.connect(self.open_preview)
         self.configure_btn.setMinimumWidth(120)
         self.configure_btn.setMinimumHeight(35)
-
-        button_layout.addWidget(self.configure_btn)
+        set_button_variant(self.configure_btn, "secondary")
 
         self.progress_widget = QWidget()
         progress_layout = QVBoxLayout(self.progress_widget)
@@ -112,24 +112,12 @@ class MergeTab(QWidget):
 
         self.status_label = QLabel()
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        set_label_role(self.status_label, "muted")
         progress_layout.addWidget(self.status_label)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setMinimumHeight(8)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                text-align: center;
-                background-color: #f0f0f0;
-            }
-            QProgressBar::chunk {
-                background-color: #007bff;
-                border-radius: 3px;
-            }
-        """)
         progress_layout.addWidget(self.progress_bar)
 
         self.file_link = QLabel()
@@ -139,7 +127,7 @@ class MergeTab(QWidget):
         self.file_link.setOpenExternalLinks(False)
         self.file_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.file_link.linkActivated.connect(self.open_file_location)
-        self.file_link.setStyleSheet("color: #007bff; text-decoration: underline; cursor: pointer;")
+        set_label_role(self.file_link, "link")
         progress_layout.addWidget(self.file_link)
 
         button_layout.addWidget(self.progress_widget)
@@ -149,11 +137,16 @@ class MergeTab(QWidget):
         self.merge_btn.setMinimumWidth(120)
         self.merge_btn.setMinimumHeight(35)
         self.merge_btn.setEnabled(False)
+        set_button_variant(self.merge_btn, "orange")
 
-        button_layout.addWidget(self.merge_btn)
+        action_row = QHBoxLayout()
+        action_row.setSpacing(10)
+        action_row.addWidget(self.configure_btn)
+        action_row.addWidget(self.merge_btn)
+        button_layout.addLayout(action_row)
 
-        layout.addLayout(button_layout)
         layout.addStretch()
+        layout.addLayout(button_layout)
 
     def handle_target_files_selected(self, files: List[str]):
         combined = []
@@ -233,12 +226,13 @@ class MergeTab(QWidget):
         self.output_files = outputs
         self.progress_bar.setValue(100)
         self.status_label.setText(tr("Объединение завершено успешно!"))
-        self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
+        set_label_state(self.status_label, "success")
 
         links = []
         for _, path in outputs:
             filename = os.path.basename(path)
-            links.append(f'<a href="file:///{path}">{filename}</a>')
+            href = QUrl.fromLocalFile(path).toString()
+            links.append(f'<a href="{href}">{filename}</a>')
         if links:
             self.file_link.setText("<br>".join(links))
             self.file_link.setVisible(True)
@@ -252,7 +246,7 @@ class MergeTab(QWidget):
         self.progress_bar.setVisible(False)
         self.file_link.setVisible(False)
         self.status_label.setText(tr("Ошибка при объединении"))
-        self.status_label.setStyleSheet("color: #dc3545; font-weight: bold;")
+        set_label_state(self.status_label, "error")
 
         self.is_processing = False
         self.merge_btn.setEnabled(True)
@@ -261,15 +255,20 @@ class MergeTab(QWidget):
         QMessageBox.critical(self, tr("Ошибка"), error_message)
 
     def open_file_location(self, link):
-        if hasattr(self, 'output_files') and self.output_files:
-            first_output = self.output_files[0][1]
-            folder = os.path.dirname(first_output)
-            if platform.system() == 'Windows':
-                subprocess.run(['explorer', '/select,', os.path.normpath(first_output)])
-            elif platform.system() == 'Darwin':
-                subprocess.run(['open', '-R', first_output])
-            else:
-                subprocess.run(['xdg-open', folder])
+        if not hasattr(self, 'output_files') or not self.output_files:
+            return
+
+        clicked_path = QUrl(link).toLocalFile() if link else ""
+        if not clicked_path:
+            clicked_path = self.output_files[0][1]
+
+        folder = os.path.dirname(clicked_path)
+        if platform.system() == 'Windows':
+            subprocess.run(['explorer', '/select,', os.path.normpath(clicked_path)])
+        elif platform.system() == 'Darwin':
+            subprocess.run(['open', '-R', clicked_path])
+        else:
+            subprocess.run(['xdg-open', folder])
 
     def retranslate_ui(self):
         self.main_label.setText(tr("Целевые Excel файлы:"))
@@ -280,4 +279,5 @@ class MergeTab(QWidget):
         self.merge_btn.setText(tr("Объединить"))
 
         if hasattr(self, 'status_label') and not self.merge_tasks:
+            set_label_state(self.status_label, "")
             self.status_label.setText(tr("Сначала настройте сопоставления"))

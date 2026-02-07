@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import string
 from copy import copy

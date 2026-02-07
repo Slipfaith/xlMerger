@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from openpyxl import Workbook
 
 from core.limit_auto import check_limits_auto

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from openpyxl import Workbook, load_workbook
 from core.merge_columns import merge_excel_columns
 

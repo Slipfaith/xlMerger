@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QLineEdit,
     QPushButton, QHBoxLayout
 )
 from PySide6.QtCore import Signal, Qt
+from ..style_system import set_button_variant
 
 class SheetColumnPage(QWidget):
     backClicked = Signal()
@@ -30,12 +32,10 @@ class SheetColumnPage(QWidget):
         for sheet_name in self.selected_sheets:
             label = QLabel(sheet_name)
             label.setAlignment(Qt.AlignLeft)
-            label.setStyleSheet("font-size: 14px; margin-bottom: 0px; padding-bottom: 0px;")
 
             entry = QLineEdit()
             entry.setMaximumWidth(120)
             entry.setText(self.default_column)
-            entry.setStyleSheet("font-size: 11pt; padding: 0px; margin: 0px;")
 
             vbox.addWidget(label, alignment=Qt.AlignLeft)
             vbox.addWidget(entry, alignment=Qt.AlignLeft)
@@ -48,6 +48,8 @@ class SheetColumnPage(QWidget):
         button_layout = QHBoxLayout()
         self.back_btn = QPushButton("Назад")
         self.next_btn = QPushButton("Далее")
+        set_button_variant(self.back_btn, "secondary")
+        set_button_variant(self.next_btn, "primary")
         self.back_btn.clicked.connect(self.backClicked.emit)
         self.next_btn.clicked.connect(self._on_next_clicked)
         button_layout.addStretch()

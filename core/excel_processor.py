@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import hashlib
 from openpyxl import load_workbook
@@ -164,13 +165,18 @@ class ExcelProcessor:
 
     def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
         data_start_row = 2 if self.skip_first_row else 1
+        sequential_target_row = header_row + 2
 
         for row in range(data_start_row, lang_sheet.max_row + 1):
             source_value = lang_sheet.cell(row=row, column=copy_col_index).value
             if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
                 continue
-            data_index = row - data_start_row
-            target_row = header_row + 2 + data_index
+            if self.copy_by_row_number:
+                data_index = row - data_start_row
+                target_row = header_row + 2 + data_index
+            else:
+                target_row = sequential_target_row
+                sequential_target_row += 1
             source_cell = lang_sheet.cell(row=row, column=copy_col_index)
             self._set_cell(sheet_name, target_row, col_index, source_value, source_cell)
 

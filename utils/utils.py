@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 def excel_column_to_index(column: str) -> int:
     """
     Конвертация буквы столбца Excel в индекс столбца (A → 1, B → 2, ..., Z → 26, AA → 27).

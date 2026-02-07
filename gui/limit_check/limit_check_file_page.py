@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox,
     QPushButton
@@ -5,6 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal
 from core.drag_drop import DragDropLineEdit
 from utils.i18n import tr
+from gui.style_system import set_button_variant
 
 class FileSelectionPage(QWidget):
     file_selected = Signal(str)
@@ -37,8 +39,10 @@ class FileSelectionPage(QWidget):
 
         btn_layout = QHBoxLayout()
         self.map_button = QPushButton(tr("Лимиты"))
+        set_button_variant(self.map_button, "secondary")
         self.map_button.clicked.connect(self.mapping_clicked.emit)
         self.next_button = QPushButton(tr("Далее"))
+        set_button_variant(self.next_button, "orange")
         self.next_button.clicked.connect(self.next_clicked.emit)
         btn_layout.addWidget(self.map_button)
         btn_layout.addWidget(self.next_button)

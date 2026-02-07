@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 from PySide6.QtCore import Signal
 from utils.i18n import tr
@@ -44,16 +45,6 @@ class MappingSettingsDialog(QDialog):
         self._file_to_column = {}
         self._folder_to_column = {}
         self._preserve_formatting = False
-
-        self.setStyleSheet(
-            """
-            QDialog { background-color: #f0f0f0; }
-            QLabel { font-size: 14px; }
-            QPushButton { padding: 6px 12px; border-radius: 4px; background-color: #3498db; color: white; }
-            QPushButton:hover { background-color: #2980b9; }
-            QComboBox { padding: 4px; }
-            """
-        )
 
     def _on_save_clicked(self):
         self.saveClicked.emit(self.match_page.get_current_mapping())

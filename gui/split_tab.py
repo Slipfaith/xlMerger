@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QMessageBox,
     QApplication, QProgressDialog
@@ -7,6 +8,7 @@ from utils.i18n import tr, i18n
 from core.drag_drop import DragDropLineEdit
 from core.split_excel import split_excel_multiple_sheets
 from gui.split_mapping_dialog import SplitMappingDialog
+from .style_system import set_button_variant
 from openpyxl import load_workbook
 
 
@@ -35,13 +37,20 @@ class SplitTab(QWidget):
         left.addWidget(self.file_input)
 
         self.config_btn = QPushButton(tr("Настроить"))
+        set_button_variant(self.config_btn, "secondary")
         self.config_btn.clicked.connect(self.open_mapping_dialog)
-        left.addWidget(self.config_btn)
 
         self.split_btn = QPushButton(tr("Разделить"))
+        set_button_variant(self.split_btn, "orange")
         self.split_btn.clicked.connect(self.run_split)
-        left.addWidget(self.split_btn)
+
+        action_row = QHBoxLayout()
+        action_row.setSpacing(10)
+        action_row.addWidget(self.config_btn)
+        action_row.addWidget(self.split_btn)
+
         left.addStretch()
+        left.addLayout(action_row)
 
         layout.addLayout(left)
 

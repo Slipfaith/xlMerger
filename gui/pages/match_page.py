@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGridLayout, QComboBox,
@@ -5,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal, Qt
 from utils.i18n import tr, i18n
+from ..style_system import set_button_variant
 
 
 class MatchPage(QWidget):
@@ -141,7 +143,6 @@ class MatchPage(QWidget):
 
         self.format_checkbox = QCheckBox(tr("Копировать с сохранением форматирования"))
         self.format_checkbox.setChecked(self._preserve_formatting)
-        self.format_checkbox.setStyleSheet("QCheckBox { padding: 4px; }")
         layout.addWidget(self.format_checkbox)
 
         button_layout = QHBoxLayout()
@@ -149,6 +150,10 @@ class MatchPage(QWidget):
         self.load_button = QPushButton(tr("Загрузить настройки"))
         self.back_button = QPushButton(tr("Назад"))
         self.next_button = QPushButton(tr("Далее"))
+        set_button_variant(self.save_button, "secondary")
+        set_button_variant(self.load_button, "secondary")
+        set_button_variant(self.back_button, "secondary")
+        set_button_variant(self.next_button, "primary")
         self.save_button.clicked.connect(self.saveClicked.emit)
         self.load_button.clicked.connect(self.loadClicked.emit)
         self.back_button.clicked.connect(self.backClicked.emit)

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from PySide6.QtWidgets import QLineEdit, QFileDialog
 from PySide6.QtCore import Signal

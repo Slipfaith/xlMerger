@@ -1,6 +1,6 @@
+# -*- coding: utf-8 -*-
 from openpyxl import load_workbook
 import os
-import subprocess
 from typing import Callable, List, Dict, Tuple
 import xlsxwriter
 from openpyxl.utils import get_column_letter
@@ -118,28 +118,6 @@ def _find_last_data_row(sheet, columns: List[int]) -> int:
     return 1
 
 
-def _run_excelltru(file_path: str) -> None:
-    """Запуск Excelltru.vbs для file_path (только на Windows)."""
-
-    if os.name != "nt":
-        return
-
-    vbs_path = os.path.join(os.path.dirname(__file__), "Excelltru.vbs")
-    if not os.path.isfile(vbs_path):
-        return
-
-    try:
-        norm_path = os.path.normpath(file_path)
-        # Оборачиваем путь в кавычки — для пробелов и кириллицы
-        subprocess.run(
-            ["cscript.exe", "//nologo", vbs_path, f'"{norm_path}"'],
-            check=True,
-            shell=True
-        )
-    except Exception as e:
-        print(f"⚠ Ошибка при запуске Excelltru.vbs: {e}")
-
-
 def split_excel_by_languages(
     excel_path: str,
     sheet_name: str,
@@ -244,7 +222,6 @@ def split_excel_by_languages(
         ws_new = wb_out.add_worksheet(sheet_name)
         _write_rows(ws_new, rows, widths, wb_out)
         wb_out.close()
-        _run_excelltru(out_path)
         created.append(out_path)
         if progress_callback:
             progress_callback(i, len(targets), out_name)
@@ -370,7 +347,6 @@ def split_excel_multiple_sheets(
             ws_new = wb_out.add_worksheet(sheet_name)
             _write_rows(ws_new, info["rows"], info["widths"], wb_out)
         wb_out.close()
-        _run_excelltru(out_path)
         created.append(out_path)
         if progress_callback:
             progress_callback(i, len(workbooks), out_name)

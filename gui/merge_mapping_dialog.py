@@ -1,11 +1,16 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QFileDialog,
     QLabel, QComboBox, QMessageBox, QScrollArea, QFrame, QGridLayout,
     QLineEdit, QRadioButton, QButtonGroup
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 import os
+from .style_system import (
+    set_button_shape,
+    set_button_variant,
+    set_label_role,
+)
 
 try:
     import openpyxl
@@ -48,17 +53,10 @@ class MappingCard(QFrame):
         self.main_structure = main_structure
         self.file_path = None
         self.file_structure = {}
+        self.setObjectName("mappingCard")
 
         self.setFrameStyle(QFrame.Box)
         self.setLineWidth(1)
-        self.setStyleSheet("""
-            MappingCard {
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                margin: 3px;
-            }
-        """)
 
         self._init_ui()
 
@@ -71,28 +69,15 @@ class MappingCard(QFrame):
         header_layout = QHBoxLayout()
 
         self.title_label = QLabel("Новое сопоставление")
-        font = QFont()
-        font.setBold(True)
-        font.setPointSize(11)
-        self.title_label.setFont(font)
+        set_label_role(self.title_label, "heading")
         header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
 
         self.remove_btn = QPushButton("✕")
         self.remove_btn.setFixedSize(25, 25)
-        self.remove_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #e57373;
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #ef5350;
-            }
-        """)
+        set_button_variant(self.remove_btn, "danger")
+        set_button_shape(self.remove_btn, "circleLarge")
         header_layout.addWidget(self.remove_btn)
 
         layout.addLayout(header_layout)
@@ -130,7 +115,7 @@ class MappingCard(QFrame):
         mode_layout = QVBoxLayout(mode_group)
 
         mode_label = QLabel("Режим сопоставления:")
-        mode_label.setStyleSheet("font-weight: bold;")
+        set_label_role(mode_label, "heading")
         mode_layout.addWidget(mode_label)
 
         self.mode_group = QButtonGroup()
@@ -208,7 +193,7 @@ class MappingCard(QFrame):
 
         if not self.file_path:
             info_label = QLabel("Сначала выберите файл")
-            info_label.setStyleSheet("color: #6c757d; font-style: italic;")
+            set_label_role(info_label, "muted")
             self.mapping_layout.addWidget(info_label)
             return
 
@@ -250,6 +235,7 @@ class MappingCard(QFrame):
         # Кнопка добавления
         add_btn = QPushButton("+ Добавить сопоставление")
         add_btn.clicked.connect(lambda: self.add_letter_mapping_row(grid, len(self.letter_mappings) + 1))
+        set_button_variant(add_btn, "secondary")
         mapping_layout.addWidget(add_btn)
 
         self.mapping_layout.addWidget(mapping_frame)
@@ -265,7 +251,8 @@ class MappingCard(QFrame):
 
         remove_btn = QPushButton("✕")
         remove_btn.setFixedSize(20, 20)
-        remove_btn.setStyleSheet("background-color: #dc3545; color: white; border: none; border-radius: 10px;")
+        set_button_variant(remove_btn, "danger")
+        set_button_shape(remove_btn, "circle")
         remove_btn.clicked.connect(lambda: self.remove_letter_mapping_row(source_edit, target_edit, remove_btn))
 
         grid.addWidget(source_edit, row, 0)
@@ -307,11 +294,13 @@ class MappingCard(QFrame):
         add_btn = QPushButton("+ Добавить сопоставление")
         add_btn.clicked.connect(
             lambda: self.add_header_mapping_row(grid, len(self.header_mappings) + 1, source_headers, target_headers))
+        set_button_variant(add_btn, "secondary")
         mapping_layout.addWidget(add_btn)
 
         # Кнопка автосопоставления
         auto_btn = QPushButton("Автосопоставить")
         auto_btn.clicked.connect(lambda: self.auto_map_headers(source_headers, target_headers))
+        set_button_variant(auto_btn, "secondary")
         mapping_layout.addWidget(auto_btn)
 
         self.mapping_layout.addWidget(mapping_frame)
@@ -329,7 +318,8 @@ class MappingCard(QFrame):
 
         remove_btn = QPushButton("✕")
         remove_btn.setFixedSize(20, 20)
-        remove_btn.setStyleSheet("background-color: #dc3545; color: white; border: none; border-radius: 10px;")
+        set_button_variant(remove_btn, "danger")
+        set_button_shape(remove_btn, "circle")
         remove_btn.clicked.connect(lambda: self.remove_header_mapping_row(source_combo, target_combo, remove_btn))
 
         grid.addWidget(source_combo, row, 0)
@@ -439,10 +429,7 @@ class MergeMappingDialog(QDialog):
         # Заголовок
         title = QLabel("Настройка объединения Excel файлов")
         title.setAlignment(Qt.AlignCenter)
-        font = QFont()
-        font.setPointSize(14)
-        font.setBold(True)
-        title.setFont(font)
+        set_label_role(title, "heading")
         layout.addWidget(title)
 
         # Скролл область для карточек
@@ -463,11 +450,12 @@ class MergeMappingDialog(QDialog):
 
         self.add_btn = QPushButton("+ Добавить сопоставление")
         self.add_btn.clicked.connect(self.add_card)
+        set_button_variant(self.add_btn, "secondary")
         controls_layout.addWidget(self.add_btn)
 
         self.apply_first_btn = QPushButton("Применить настройки первого ко всем")
         self.apply_first_btn.clicked.connect(self.apply_first_to_all)
-        self.apply_first_btn.setStyleSheet("background-color: #d2f7c6; color: black;")
+        set_button_variant(self.apply_first_btn, "secondary")
         controls_layout.addWidget(self.apply_first_btn)
 
         controls_layout.addStretch()
@@ -480,10 +468,12 @@ class MergeMappingDialog(QDialog):
         self.ok_btn = QPushButton("Готово")
         self.ok_btn.clicked.connect(self.accept)
         self.ok_btn.setMinimumWidth(100)
+        set_button_variant(self.ok_btn, "primary")
 
         self.cancel_btn = QPushButton("Отмена")
         self.cancel_btn.clicked.connect(self.reject)
         self.cancel_btn.setMinimumWidth(100)
+        set_button_variant(self.cancel_btn, "secondary")
 
         dialog_btns.addWidget(self.ok_btn)
         dialog_btns.addWidget(self.cancel_btn)

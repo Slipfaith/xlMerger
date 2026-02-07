@@ -1,9 +1,11 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QComboBox,
     QPushButton, QHBoxLayout, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
+from ..style_system import set_button_variant, set_label_role
 
 class HeaderRowPage(QWidget):
     backClicked = Signal()
@@ -19,6 +21,7 @@ class HeaderRowPage(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         self.title_label = QLabel()
+        set_label_role(self.title_label, "heading")
         layout.addWidget(self.title_label)
 
         scroll_area = QScrollArea()
@@ -35,14 +38,9 @@ class HeaderRowPage(QWidget):
         for sheet_name in self.selected_sheets:
             label = QLabel(sheet_name)
             label.setAlignment(Qt.AlignLeft)
-            label.setStyleSheet("font-size: 14px; margin-bottom: 0px; padding-bottom: 0px;")
             combo = QComboBox()
-            combo.setStyleSheet("font-size: 14pt;")
             combo.setMaximumWidth(72)
             combo.setMinimumWidth(48)
-            combo.setStyleSheet(
-                "margin-top: 0px; margin-bottom: 0px; padding: 0px;"
-            )
             combo.addItems([str(i) for i in range(1, 21)])
             combo.setCurrentIndex(0)
             combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -58,6 +56,8 @@ class HeaderRowPage(QWidget):
         button_layout = QHBoxLayout()
         self.back_btn = QPushButton(tr("Назад"))
         self.next_btn = QPushButton(tr("Далее"))
+        set_button_variant(self.back_btn, "secondary")
+        set_button_variant(self.next_btn, "primary")
         self.back_btn.clicked.connect(self.backClicked.emit)
         self.next_btn.clicked.connect(self._on_next_clicked)
         button_layout.addStretch()

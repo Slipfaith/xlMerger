@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QListWidget, QListWidgetItem,

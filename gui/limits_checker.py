@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import sys
 import os
 from PySide6.QtWidgets import (
@@ -13,6 +15,7 @@ from core.drag_drop import DragDropLineEdit
 from core.limit_auto import check_limits_auto
 from core.limit_manual import check_limits_manual
 from utils.i18n import tr
+from .style_system import set_button_variant
 
 def _get_int_value(value):
     try:
@@ -23,8 +26,8 @@ def _get_int_value(value):
 
 # --- DRAGGABLE HEADER FOR DRAG-SELECT ---
 class DraggableHeaderView(QHeaderView):
-    dragSelectionChanged = Signal(set)  # set индексов колонок
-    rightClicked = Signal(int)  # индекс колонки
+    dragSelectionChanged = Signal(set)
+    rightClicked = Signal(int)
 
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -79,11 +82,17 @@ class FileSelectionPage(QWidget):
         self.sheet_label = QLabel(tr("Лист: (не выбран)"))
         layout.addWidget(self.sheet_label)
         self.mapping_btn = QPushButton(tr("Проверить лимиты"))
+        set_button_variant(self.mapping_btn, "secondary")
         self.mapping_btn.clicked.connect(self.mapping_clicked.emit)
-        layout.addWidget(self.mapping_btn)
         self.next_btn = QPushButton(tr("Далее"))
+        set_button_variant(self.next_btn, "orange")
         self.next_btn.clicked.connect(self.next_clicked.emit)
-        layout.addWidget(self.next_btn)
+
+        buttons_row = QHBoxLayout()
+        buttons_row.setSpacing(10)
+        buttons_row.addWidget(self.mapping_btn)
+        buttons_row.addWidget(self.next_btn)
+        layout.addLayout(buttons_row)
         self._sheetnames = []
         self._current_sheet = ""
 
@@ -491,3 +500,4 @@ if __name__ == '__main__':
     window = LimitsChecker()
     window.show()
     sys.exit(app.exec())
+

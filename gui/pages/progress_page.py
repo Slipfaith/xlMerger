@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
 # gui/pages/progress_page.py
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
+from ..style_system import set_label_role, set_label_state
 
 class ProgressPage(QWidget):
     def __init__(self, parent=None):
@@ -12,35 +13,16 @@ class ProgressPage(QWidget):
         # --- Текущий файл и статус ---
         self.label_file_info = QLabel("")
         self.label_file_info.setAlignment(Qt.AlignCenter)
-        font = QFont()
-        font.setPointSize(10)
-        font.setBold(True)
-        self.label_file_info.setFont(font)
+        set_label_role(self.label_file_info, "heading")
 
         # --- Прогресс-бар ---
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setAlignment(Qt.AlignCenter)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                text-align: center;
-                height: 30px;
-                border-radius: 7px;
-                background-color: #F3F3F3;
-                font-size: 14px;
-            }
-            QProgressBar::chunk {
-                background-color: #f47929;
-                border-radius: 7px;
-            }
-        """)
 
         # --- Галочка завершения ---
         self.label_done = QLabel("")
         self.label_done.setAlignment(Qt.AlignCenter)
-        done_font = QFont()
-        done_font.setPointSize(16)
-        done_font.setBold(True)
-        self.label_done.setFont(done_font)
+        set_label_role(self.label_done, "heading")
         self.label_done.hide()
 
         # --- Анимация барa ---
@@ -76,11 +58,12 @@ class ProgressPage(QWidget):
             self.label_file_info.setText(f"Сейчас: {self._short_name(filename)}")
         else:
             self.label_file_info.clear()
+        set_label_state(self.label_done, "")
         self.label_done.hide()
 
     def set_complete(self):
         self.label_done.setText("✔ Готово!")
-        self.label_done.setStyleSheet("color: #47A447;")
+        set_label_state(self.label_done, "success")
         self.label_done.show()
         self.progress_bar.setValue(self.progress_bar.maximum())
         self.label_file_info.setText("Файлы успешно скопированы!")

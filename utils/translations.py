@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Embedded translations generated from locales
 TRANSLATIONS = {
     "en": {

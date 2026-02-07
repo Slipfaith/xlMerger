@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # gui/main_page.py
 
 from PySide6.QtWidgets import (
@@ -8,6 +9,7 @@ from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
 
 from core.drag_drop import DragDropLineEdit
+from .style_system import set_button_variant
 
 class MainPageWidget(QWidget):
     # Сигналы для FileProcessorApp
@@ -129,6 +131,7 @@ class MainPageWidget(QWidget):
     def create_process_button(self):
         self.process_button = QPushButton(tr("Начать"), self)
         self.process_button.setEnabled(False)
+        set_button_variant(self.process_button, "orange")
         # Стили убраны, используем стандартный вид с границами
         self.process_button.clicked.connect(self.processTriggered)
         return self.process_button

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # core/limit_auto.py
 
 from openpyxl.styles import PatternFill

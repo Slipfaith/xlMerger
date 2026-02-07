@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # core/excel_processor.py
 
 from openpyxl import load_workbook

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
@@ -12,6 +13,8 @@ from PySide6.QtGui import QAction, QIcon, QFont, QPixmap, QPainter
 from PySide6.QtCore import Qt
 from utils.i18n import tr, i18n
 from __init__ import __version__
+from pathlib import Path
+from .style_system import set_button_variant
 
 from .file_processor_app import FileProcessorApp
 from .limits_checker import LimitsChecker
@@ -62,95 +65,8 @@ class MainWindow(QMainWindow):
         self.apply_modern_style()
 
     def apply_modern_style(self):
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #fafafa;
-                color: #2c2c2c;
-            }
-
-            QTabWidget::pane {
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                background-color: #ffffff;
-                margin-top: 2px;
-            }
-
-            QTabWidget::tab-bar {
-                alignment: left;
-            }
-
-            QTabBar::tab {
-                background-color: #f5f5f5;
-                color: #666666;
-                padding: 12px 24px;
-                margin-right: 2px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-                font-weight: 500;
-                font-size: 14px;
-                min-width: 100px;
-                border: 1px solid #e0e0e0;
-                border-bottom: none;
-            }
-
-            QTabBar::tab:selected {
-                background-color: #ffffff;
-                color: #2c2c2c;
-                border-color: #e0e0e0;
-                font-weight: 600;
-            }
-
-            QTabBar::tab:hover:!selected {
-                background-color: #eeeeee;
-                color: #424242;
-            }
-
-            QMenuBar {
-                background-color: #ffffff;
-                color: #2c2c2c;
-                border-bottom: 1px solid #e0e0e0;
-                padding: 4px 0px;
-                font-size: 14px;
-            }
-
-            QMenuBar::item {
-                background-color: transparent;
-                padding: 8px 16px;
-                border-radius: 4px;
-                margin: 2px 4px;
-            }
-
-            QMenuBar::item:selected {
-                background-color: #f0f0f0;
-                color: #1976d2;
-            }
-
-            QMenu {
-                background-color: #ffffff;
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                padding: 4px;
-                font-size: 14px;
-                box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-            }
-
-            QMenu::item {
-                padding: 8px 20px;
-                border-radius: 4px;
-                margin: 1px;
-            }
-
-            QMenu::item:selected {
-                background-color: #e3f2fd;
-                color: #1976d2;
-            }
-
-            QMenu::separator {
-                height: 1px;
-                background-color: #e0e0e0;
-                margin: 4px 0px;
-            }
-        """)
+        # Global style is applied on QApplication level.
+        return
 
     def retranslate_ui(self):
         self.setWindowTitle(tr("xlMerger: объединяй и проверяй"))
@@ -210,6 +126,7 @@ class MainWindow(QMainWindow):
 
         header = QHBoxLayout()
         self.back_button = QPushButton(self._get_back_button_text())
+        set_button_variant(self.back_button, "secondary")
         self.back_button.clicked.connect(self.show_main_screen)
         header.addWidget(self.back_button)
         header.addStretch()
@@ -243,6 +160,12 @@ class MainWindow(QMainWindow):
         return QIcon(pixmap)
 
     def _get_app_icon(self) -> QIcon:
+        local_icon_path = Path(__file__).resolve().parent.parent / "xlM2.0.ico"
+        if local_icon_path.exists():
+            local_icon = QIcon(str(local_icon_path))
+            if not local_icon.isNull():
+                return local_icon
+
         icon = QIcon.fromTheme("spreadsheet")
         if not icon.isNull():
             return icon
@@ -271,26 +194,4 @@ class MainWindow(QMainWindow):
         msgbox.setWindowTitle(tr("About"))
         msgbox.setText(info_text)
         msgbox.setIcon(QMessageBox.Information)
-        msgbox.setStyleSheet("""
-            QMessageBox {
-                background-color: #ffffff;
-                color: #2c2c2c;
-                font-size: 14px;
-            }
-            QMessageBox QPushButton {
-                background-color: #1976d2;
-                color: white;
-                border: none;
-                padding: 8px 24px;
-                border-radius: 4px;
-                font-weight: 500;
-                min-width: 80px;
-            }
-            QMessageBox QPushButton:hover {
-                background-color: #1565c0;
-            }
-            QMessageBox QPushButton:pressed {
-                background-color: #0d47a1;
-            }
-        """)
         msgbox.exec()
