@@ -155,13 +155,18 @@ class ExcelProcessor:
 
     def _copy_from_folder(self, lang_folder_path, main_sheet_name, copy_col_index, header_row, col_index):
         for filename in os.listdir(lang_folder_path):
+            if filename.startswith('~$'):
+                continue
             file_path = os.path.join(lang_folder_path, filename)
             if os.path.isfile(file_path) and filename.endswith(('.xlsx', '.xls')):
-                lang_wb = load_workbook(file_path)
-                target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
-                lang_sheet = lang_wb[target_sheet_name]
-                self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
-                lang_wb.close()
+                try:
+                    lang_wb = load_workbook(file_path)
+                    target_sheet_name = self._find_matching_sheet(lang_wb, main_sheet_name, file_path)
+                    lang_sheet = lang_wb[target_sheet_name]
+                    self._copy_from_sheet(lang_sheet, main_sheet_name, copy_col_index, header_row, col_index)
+                    lang_wb.close()
+                except Exception as e:
+                    self.logger.log_error(f"Ошибка при обработке файла '{filename}': {e}", "", "", file_path)
 
     def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
         data_start_row = 2 if self.skip_first_row else 1

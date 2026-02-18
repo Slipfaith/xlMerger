@@ -8871,3 +8871,18 @@
 [2026-02-08 01:05:36] COPY: 2.0.0 R124C18 -> '能取得 專屬獎勵，強化你的進度！'
 [2026-02-08 01:05:36] COPY: 2.0.0 R125C18 -> '新手榴彈'
 [2026-02-08 01:05:37] INFO: Файл успешно сохранён: //srv-nt/Games-MLV/Panzerdog/_2025/250530_PZD localization - 2.0.0/20_Project/en-US/PZD localization - 2.0.0totr_out.xlsx
+[2026-02-18 22:42:53] INFO: Загружен основной Excel: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/10_To_translate/GRIMPS.xlsx
+[2026-02-18 22:42:53] INFO: Обрабатывается лист: Внутриигровые тексты
+[2026-02-18 22:42:53] INFO: Копирование из папки: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\de-DE, лист: Внутриигровые тексты, столбец: DE
+[2026-02-18 22:42:53] ERROR: Ошибка при обработке файла 'GRIMPS_EN-DE.xlsx': 'MergedCell' object attribute 'value' is read-only RC -> '//srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\\de-DE\\GRIMPS_EN-DE.xlsx'
+[2026-02-18 22:42:53] INFO: Копирование из папки: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\ko-KR, лист: Внутриигровые тексты, столбец: KOR
+[2026-02-18 22:42:53] ERROR: Ошибка при обработке файла 'GRIMPS_EN-KOR.xlsx': 'MergedCell' object attribute 'value' is read-only RC -> '//srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\\ko-KR\\GRIMPS_EN-KOR.xlsx'
+[2026-02-18 22:42:53] INFO: Копирование из папки: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\pl-PL, лист: Внутриигровые тексты, столбец: PL
+[2026-02-18 22:42:53] ERROR: Ошибка при обработке файла 'GRIMPS_EN-PL.xlsx': 'MergedCell' object attribute 'value' is read-only RC -> '//srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\\pl-PL\\GRIMPS_EN-PL.xlsx'
+[2026-02-18 22:42:53] INFO: Копирование из папки: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\pt-BR, лист: Внутриигровые тексты, столбец: PTBR
+[2026-02-18 22:42:53] ERROR: Ошибка при обработке файла 'GRIMPS_EN-PTBR.xlsx': 'MergedCell' object attribute 'value' is read-only RC -> '//srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\\pt-BR\\GRIMPS_EN-PTBR.xlsx'
+[2026-02-18 22:42:53] INFO: Копирование из папки: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\zh-CN, лист: Внутриигровые тексты, столбец: ZH
+[2026-02-18 22:42:53] ERROR: Ошибка при обработке файла 'GRIMPS_EN-ZH.xlsx': 'MergedCell' object attribute 'value' is read-only RC -> '//srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\\zh-CN\\GRIMPS_EN-ZH.xlsx'
+[2026-02-18 22:42:53] INFO: Копирование из папки: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\zh-TW, лист: Внутриигровые тексты, столбец: ZHT
+[2026-02-18 22:42:53] ERROR: Ошибка при обработке файла 'GRIMPS_EN-ZHT.xlsx': 'MergedCell' object attribute 'value' is read-only RC -> '//srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/2\\zh-TW\\GRIMPS_EN-ZHT.xlsx'
+[2026-02-18 22:42:53] INFO: Файл успешно сохранён: //srv-nt/Games-MLV/Ватт геймс/20260216_Add demo loc and UI proof/10_To_translate/GRIMPS_out.xlsx
