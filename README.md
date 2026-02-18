@@ -1,42 +1,115 @@
-# xlMerger
+﻿# xlMerger
 
-![xlMerger icon](xlM2.0.png)
+Desktop utility for working with translation Excel files: merge, split, limit checks, and batch editing.
 
 ## English
 
-xlMerger is a desktop utility designed for teams who work with translation spreadsheets. It keeps multilingual columns in sync, helps reviewers spot overlong text, and simplifies handing off work in manageable chunks.
+### What the app can do
 
-### Features
+- `xlMerger` tab:
+  - copy values from source files/folders into selected columns of a target workbook;
+  - select multiple sheets and set header row per sheet;
+  - map source files/folders to target columns;
+  - map mismatched sheet names between source and target files;
+  - choose copy mode:
+    - sequential fill (skip empty source values),
+    - row-by-row copy by row number;
+  - optional style copy (preserve source formatting);
+  - save/load mapping settings as JSON;
+  - preview source files before processing;
+  - write output as `<target>_out.xlsx` and keep copy logs.
 
-- Combine matching columns from several Excel spreadsheets into a single, consolidated file while preserving headers and row order.
-- Highlight strings that exceed the allowed length limits and provide quick prompts for manual approval or trimming.
-- Split large workbooks into multiple files by row count or sheet selection to distribute tasks among teammates.
-- Drag and drop files directly into the window, then preview the source and target columns before merging.
-- Keep a copy log of processed files so you can retrace which sources fed the final result.
+- `Лимит чек` tab:
+  - check text length limits in automatic or manual mode;
+  - configure mappings `limit column -> text columns`;
+  - configure manual checks for selected cells with upper/lower bounds;
+  - highlight/report violations and save result as `<file>_checked.xlsx`.
 
-### Typical flow
+- `xlSplit` tab:
+  - split workbook by language columns for one or multiple sheets;
+  - set source column, target columns, and extra columns per sheet;
+  - preserve column widths/basic styles in output;
+  - generate per-language files like `<file>_<src>-<target>.xlsx`.
 
-1. Drop your source spreadsheets into xlMerger and pick the columns you want to bring together.
-2. Set the target workbook and confirm how length limits should be checked.
-3. Review the preview to ensure column alignment looks right, then run the merge.
-4. Save the combined file or split it into smaller handoffs for translators and reviewers.
+- `xlCombine` tab:
+  - merge multiple source files into one or more target workbooks;
+  - configure per-file/per-sheet column mappings;
+  - run merge in background with progress and output links;
+  - save merged files as `<target>_merged.xlsx`.
+
+- `xlCraft` tab:
+  - batch edit many Excel files from a folder or file list;
+  - operations:
+    - rename headers (by column letter or header text),
+    - fill a specific cell (optionally only when empty),
+    - rename sheets,
+    - clear a column (optionally clear formatting too);
+  - apply operations to all files or a specific file scope;
+  - preview sheets before execution and export edited copies to `*_upd` folder.
+
+- General:
+  - drag-and-drop for files/folders;
+  - RU/EN interface switch.
+
+### Run
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
 ## Русский
 
-xlMerger — это настольная утилита для команд, работающих с переводческими таблицами. Она поддерживает синхронизацию многоязычных столбцов, помогает заметить слишком длинные строки и облегчает раздачу задач частями.
+### Возможности программы
 
-### Возможности
+- Вкладка `xlMerger`:
+  - копирование значений из исходных файлов/папок в выбранные колонки целевого Excel;
+  - выбор нескольких листов и строки заголовков для каждого листа;
+  - сопоставление исходных файлов/папок с целевыми колонками;
+  - сопоставление имен листов, если они отличаются;
+  - два режима копирования:
+    - последовательное заполнение (пропуск пустых значений),
+    - копирование по номеру строки;
+  - опциональное сохранение форматирования исходных ячеек;
+  - сохранение/загрузка настроек сопоставления в JSON;
+  - предпросмотр исходных файлов;
+  - сохранение результата как `<target>_out.xlsx` и ведение логов копирования.
 
-- Объединение совпадающих столбцов из нескольких Excel-файлов в один итоговый документ с сохранением заголовков и порядка строк.
-- Подсветка строк, превышающих заданный лимит длины, с быстрыми подсказками для ручного подтверждения или обрезки.
-- Разделение крупных книг на несколько файлов по количеству строк или выбранным листам, чтобы распределить задачи между коллегами.
-- Перетаскивание файлов прямо в окно и предварительный просмотр источников и целевых столбцов перед объединением.
-- Ведение журнала копирования, чтобы всегда знать, какие исходники легли в основу итогового файла.
+- Вкладка `Лимит чек`:
+  - проверка ограничений длины текста в авто и ручном режимах;
+  - настройка сопоставлений `колонка лимита -> текстовые колонки`;
+  - ручная проверка выбранных ячеек с верхним/нижним порогом;
+  - подсветка/отчет по нарушениям и сохранение `<file>_checked.xlsx`.
 
-### Типовой сценарий работы
+- Вкладка `xlSplit`:
+  - разбиение книги по языковым колонкам для одного или нескольких листов;
+  - настройка source, target и дополнительных колонок по каждому листу;
+  - сохранение ширины колонок и базового форматирования;
+  - генерация файлов вида `<file>_<src>-<target>.xlsx`.
 
-1. Перетащите исходные таблицы в xlMerger и выберите столбцы, которые нужно объединить.
-2. Укажите целевую книгу и настройте правила проверки длины строк.
-3. Проверьте предварительный просмотр, чтобы убедиться в корректном сопоставлении столбцов, затем запускайте объединение.
-4. Сохраните общий файл или разбейте его на небольшие части для переводчиков и редакторов.
+- Вкладка `xlCombine`:
+  - объединение данных из нескольких исходников в один или несколько целевых файлов;
+  - настройка соответствий колонок по файлам и листам;
+  - фоновая обработка с прогрессом и ссылками на результат;
+  - сохранение результата как `<target>_merged.xlsx`.
 
+- Вкладка `xlCraft`:
+  - пакетная обработка множества Excel-файлов из папки или списка;
+  - операции:
+    - переименование заголовков (по букве колонки или по тексту),
+    - заполнение конкретной ячейки (в т.ч. только пустых),
+    - переименование листов,
+    - очистка колонки (опционально с очисткой формата);
+  - применение операций ко всем файлам или к выбранному файлу;
+  - предпросмотр листов перед запуском и вывод копий в папку `*_upd`.
+
+- Общее:
+  - drag-and-drop файлов и папок;
+  - переключение языка интерфейса RU/EN.
+
+### Запуск
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
