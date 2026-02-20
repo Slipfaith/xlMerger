@@ -41,6 +41,14 @@ def _detect_header_row(ws, max_rows: int = 5) -> int:
     return best_row
 
 
+def _normalize_headers(header_values) -> List[str]:
+    """Convert row values to strings and drop trailing empty headers."""
+    headers = [str(val).strip() if val is not None else "" for val in header_values]
+    while headers and not headers[-1]:
+        headers.pop()
+    return headers
+
+
 def _read_structure(path: str) -> Dict[str, Dict[str, object]]:
     """Collect sheet headers and guessed header rows for similarity checks."""
 
@@ -54,7 +62,7 @@ def _read_structure(path: str) -> Dict[str, Dict[str, object]]:
                 ws.iter_rows(min_row=header_row, max_row=header_row, values_only=True),
                 (),
             )
-            headers = [str(val).strip() if val is not None else "" for val in header_values]
+            headers = _normalize_headers(header_values)
             structure[sheet_name] = {
                 "header_row": header_row,
                 "headers": headers,
@@ -110,9 +118,10 @@ def _auto_column_mapping(target_path: str, source_path: str,
         if not target_sheet and tgt_struct:
             # pick sheet with maximum header overlap
             best_overlap = 0
+            src_headers_set = {h.lower() for h in src_info.get("headers", []) if h}
             for candidate, tgt_info in tgt_struct.items():
                 tgt_headers = {h.lower() for h in tgt_info.get("headers", []) if h}
-                overlap = len(tgt_headers & {h.lower() for h in src_info.get("headers", []) if h})
+                overlap = len(tgt_headers & src_headers_set)
                 if overlap > best_overlap:
                     best_overlap = overlap
                     target_sheet = candidate
@@ -122,14 +131,20 @@ def _auto_column_mapping(target_path: str, source_path: str,
 
         tgt_headers = tgt_struct.get(target_sheet, {}).get("headers", [])
         src_headers = src_info.get("headers", [])
+        header_to_target_idx: Dict[str, int] = {}
+        for tgt_idx, tgt_header in enumerate(tgt_headers):
+            norm = str(tgt_header).strip().lower()
+            if norm and norm not in header_to_target_idx:
+                header_to_target_idx[norm] = tgt_idx
+
         pairs: List[tuple[int, int]] = []
         for idx, header in enumerate(src_headers):
-            if not header:
+            norm = str(header).strip().lower()
+            if not norm:
                 continue
-            for tgt_idx, tgt_header in enumerate(tgt_headers):
-                if header.strip().lower() == str(tgt_header).strip().lower():
-                    pairs.append((idx, tgt_idx))
-                    break
+            tgt_idx = header_to_target_idx.get(norm)
+            if tgt_idx is not None:
+                pairs.append((idx, tgt_idx))
 
         if pairs:
             mappings.append({

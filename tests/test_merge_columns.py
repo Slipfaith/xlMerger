@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from openpyxl import Workbook, load_workbook
-from core.merge_columns import merge_excel_columns
+from openpyxl.styles import PatternFill
+from core.merge_columns import merge_excel_columns, _get_data_max_row
 
 
 def create_wb(path, data, sheet_name="Sheet1"):
@@ -66,4 +67,45 @@ def test_merge_excel_columns_skips_empty_rows(tmp_path):
     assert ws["B3"].value is None
     assert ws["B4"].value is None
     assert ws["B6"].value is None
+    wb.close()
+
+
+def test_get_data_max_row_ignores_style_only_rows(tmp_path):
+    src_path = tmp_path / "style_only.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws["A5000"].fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    wb.save(src_path)
+    wb.close()
+
+    wb = load_workbook(src_path, data_only=True)
+    ws = wb.active
+    assert _get_data_max_row(ws) == 0
+    wb.close()
+
+
+def test_merge_excel_columns_handles_style_only_source_sheet(tmp_path):
+    main_path = tmp_path / "main.xlsx"
+    src_path = tmp_path / "src_style_only.xlsx"
+
+    create_wb(main_path, {"A": ["h1", "h2", "h3"]}, sheet_name="Main")
+    wb_src = Workbook()
+    ws_src = wb_src.active
+    ws_src["A7000"].fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
+    wb_src.save(src_path)
+    wb_src.close()
+
+    mappings = [{
+        "source": str(src_path),
+        "source_columns": ["A"],
+        "target_sheet": "Main",
+        "target_columns": ["B"],
+    }]
+
+    output = merge_excel_columns(str(main_path), mappings)
+    wb = load_workbook(output)
+    ws = wb["Main"]
+    assert ws["B1"].value is None
+    assert ws["B2"].value is None
+    assert ws["B3"].value is None
     wb.close()

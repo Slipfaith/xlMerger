@@ -168,17 +168,31 @@ class ExcelProcessor:
                 except Exception as e:
                     self.logger.log_error(f"Ошибка при обработке файла '{filename}': {e}", "", "", file_path)
 
+    @staticmethod
+    def _get_data_max_row(ws) -> int:
+        """Return the last row that contains a non-None value.
+
+        ``ws.max_row`` can be inflated when formatting is applied to
+        cells far beyond the actual data range, causing the copy loop
+        to iterate over millions of empty rows and appear frozen.
+        """
+        max_row = 0
+        for (r, _c), cell in ws._cells.items():
+            if cell.value is not None and r > max_row:
+                max_row = r
+        return max_row
+
     def _copy_from_sheet(self, lang_sheet, sheet_name, copy_col_index, header_row, col_index):
         data_start_row = 2 if self.skip_first_row else 1
         sequential_target_row = header_row + 2
+        actual_max_row = self._get_data_max_row(lang_sheet)
 
-        for row in range(data_start_row, lang_sheet.max_row + 1):
+        for row in range(data_start_row, actual_max_row + 1):
             source_value = lang_sheet.cell(row=row, column=copy_col_index).value
             if source_value is None or (isinstance(source_value, str) and source_value.strip() == ""):
                 continue
             if self.copy_by_row_number:
-                data_index = row - data_start_row
-                target_row = header_row + 2 + data_index
+                target_row = row
             else:
                 target_row = sequential_target_row
                 sequential_target_row += 1

@@ -24,6 +24,13 @@ except ImportError:
     xlrd = None
 
 
+def _normalize_headers(row_values):
+    headers = [str(val).strip() if val is not None else "" for val in row_values]
+    while headers and not headers[-1]:
+        headers.pop()
+    return headers
+
+
 def get_excel_structure(path):
     sheets = {}
     ext = os.path.splitext(path)[1].lower()
@@ -33,14 +40,14 @@ def get_excel_structure(path):
             ws = wb[sheet]
             headers = []
             for row in ws.iter_rows(min_row=1, max_row=1, values_only=True):
-                headers = [str(val) if val is not None else "" for val in row]
+                headers = _normalize_headers(row)
             sheets[sheet] = headers
         wb.close()
     elif ext == ".xls" and xlrd:
         wb = xlrd.open_workbook(path)
         for sheet in wb.sheet_names():
             ws = wb.sheet_by_name(sheet)
-            headers = [str(ws.cell_value(0, col)) for col in range(ws.ncols)]
+            headers = _normalize_headers(ws.row_values(0))
             sheets[sheet] = headers
     else:
         raise Exception("Unsupported file format or required lib missing")
@@ -391,8 +398,12 @@ class MappingCard(QFrame):
                     target_headers = self.main_structure.get(target_sheet, [])
 
                     if src_idx - 1 < len(source_headers) and tgt_idx - 1 < len(target_headers):
-                        source_columns.append(source_headers[src_idx - 1])
-                        target_columns.append(target_headers[tgt_idx - 1])
+                        if get_column_letter:
+                            source_columns.append(get_column_letter(src_idx))
+                            target_columns.append(get_column_letter(tgt_idx))
+                        else:
+                            source_columns.append(chr(64 + src_idx))
+                            target_columns.append(chr(64 + tgt_idx))
 
         if not source_columns or not target_columns:
             return None

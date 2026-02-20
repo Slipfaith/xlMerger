@@ -8,6 +8,22 @@ from openpyxl.styles import PatternFill
 from openpyxl.utils import column_index_from_string
 
 
+def _get_data_max_row(ws) -> int:
+    """Return the last row that contains a non-None value.
+
+    ``ws.max_row`` can be inflated when formatting (fonts, fills, etc.)
+    is applied to cells far beyond the actual data range.  Iterating up
+    to ``max_row`` in that case causes the merge to appear frozen.  This
+    helper inspects the worksheet's internal cell store to find the true
+    last data row in O(cells-in-file) time.
+    """
+    max_row = 0
+    for (r, _c), cell in ws._cells.items():
+        if cell.value is not None and r > max_row:
+            max_row = r
+    return max_row
+
+
 def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], output_file: str | None = None,
                         progress_callback=None) -> str:
     """Merge columns from multiple Excel files into a main workbook.
@@ -56,10 +72,12 @@ def merge_excel_columns(main_file: str, mappings: List[Dict[str, object]], outpu
             wb_src = load_workbook(src, data_only=True)
             ws_src = wb_src.active
 
+            actual_max_row = _get_data_max_row(ws_src)
+
             for s_col, t_col in zip(src_cols, tgt_cols):
                 s_idx = column_index_from_string(s_col)
                 t_idx = column_index_from_string(t_col)
-                for row in range(1, ws_src.max_row + 1):
+                for row in range(1, actual_max_row + 1):
                     source_cell = ws_src.cell(row=row, column=s_idx)
                     if source_cell.value is None:
                         continue

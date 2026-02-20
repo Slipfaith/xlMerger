@@ -83,11 +83,17 @@ class MainPageLogic(QObject):
             self.ui.sheet_list.item(index).setCheckState(Qt.Checked)
 
     def get_selected_sheets(self):
-        return [
-            self.ui.sheet_list.item(i).text()
-            for i in range(self.ui.sheet_list.count())
-            if self.ui.sheet_list.item(i).checkState() == Qt.Checked
-        ]
+        selected = []
+        for i in range(self.ui.sheet_list.count()):
+            item = self.ui.sheet_list.item(i)
+            state = item.checkState()
+            try:
+                is_checked = int(state) == int(Qt.Checked)
+            except Exception:
+                is_checked = state == Qt.Checked or state == 2
+            if is_checked:
+                selected.append(item.text())
+        return selected
 
     def on_preview_clicked(self):
         available_files = self._collect_source_files()
@@ -125,7 +131,8 @@ class MainPageLogic(QObject):
         target_excel = self.ui.excel_file_entry.text().strip()
         target_ok = bool(target_excel) and os.path.isfile(target_excel)
         can_start = bool(source_files) and bool(copy_column) and target_ok
-        self.ui.process_button.setEnabled(can_start)
+        if hasattr(self.ui, "process_button"):
+            self.ui.process_button.setEnabled(can_start)
 
     def _collect_source_files(self):
         if self.selected_files:
