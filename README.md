@@ -1,6 +1,7 @@
 ﻿# xlMerger
 
 Desktop utility for working with translation Excel files: merge, split, limit checks, and batch editing.
+Current version: `11.04.2026`
 
 ## English
 
@@ -31,12 +32,6 @@ Desktop utility for working with translation Excel files: merge, split, limit ch
   - preserve column widths/basic styles in output;
   - generate per-language files like `<file>_<src>-<target>.xlsx`.
 
-- `xlCombine` tab:
-  - merge multiple source files into one or more target workbooks;
-  - configure per-file/per-sheet column mappings;
-  - run merge in background with progress and output links;
-  - save merged files as `<target>_merged.xlsx`.
-
 - `xlCraft` tab:
   - batch edit many Excel files from a folder or file list;
   - operations:
@@ -59,6 +54,8 @@ python main.py
 ```
 
 ## Русский
+
+Текущая версия: `11.04.2026`
 
 ### Возможности программы
 
@@ -86,12 +83,6 @@ python main.py
   - настройка source, target и дополнительных колонок по каждому листу;
   - сохранение ширины колонок и базового форматирования;
   - генерация файлов вида `<file>_<src>-<target>.xlsx`.
-
-- Вкладка `xlCombine`:
-  - объединение данных из нескольких исходников в один или несколько целевых файлов;
-  - настройка соответствий колонок по файлам и листам;
-  - фоновая обработка с прогрессом и ссылками на результат;
-  - сохранение результата как `<target>_merged.xlsx`.
 
 - Вкладка `xlCraft`:
   - пакетная обработка множества Excel-файлов из папки или списка;

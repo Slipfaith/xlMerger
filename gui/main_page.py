@@ -3,7 +3,7 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QRadioButton,
-    QListWidget, QLineEdit
+    QListWidget, QLineEdit, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
@@ -34,7 +34,7 @@ class MainPageWidget(QWidget):
         layout.addWidget(self.create_skip_first_row_checkbox())
         layout.addLayout(self.create_copy_method_selection_layout())
         layout.addWidget(self.create_preview_button(), alignment=Qt.AlignRight)
-        layout.addWidget(self.create_copy_column_status_label(), alignment=Qt.AlignCenter)
+        layout.addWidget(self.create_copy_column_status_label())
         layout.addWidget(self.create_process_button(), alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
@@ -135,6 +135,7 @@ class MainPageWidget(QWidget):
         self.copy_column_status_label = QLabel(self)
         self.copy_column_status_label.setAlignment(Qt.AlignCenter)
         self.copy_column_status_label.setWordWrap(True)
+        self.copy_column_status_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         set_label_state(self.copy_column_status_label, "error")
         self.copy_column_status_label.setHidden(True)
         return self.copy_column_status_label

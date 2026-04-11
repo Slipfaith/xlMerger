@@ -12,6 +12,18 @@ __pycache__/
 *.out
 *.bak
 *.txt
+copy_log.txt
+core/error_log.txt
+gui/error_log.txt
+
+# Pytest / temp artifacts
+.pytest_cache/
+.pytest_tmp/
+.pytest_tmp_local/
+.test_tmp/
+tests/.pytest_tmp/
+tests/pytest-cache-files-*/
+tmp*/
 
 # Env & config
 .env

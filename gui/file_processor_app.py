@@ -2,6 +2,7 @@
 import os
 import json
 import traceback
+from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QStackedWidget, QMessageBox,
     QHBoxLayout, QLabel,
@@ -28,13 +29,19 @@ def short_name_no_ext(name, n=5):
     return f"{base[:n]}...{base[-n:]}"
 
 
+def _get_local_icon_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "xlM2.0.ico"
+
+
 class FileProcessorApp(QWidget):
     copyingStarted = Signal()
 
     def __init__(self):
         super().__init__()
         self.stack = QStackedWidget(self)
-        self.setWindowIcon(QIcon(r"C:\Users\yanismik\Desktop\PythonProject1\xlM_2.0\xlM2.0.ico"))
+        icon_path = _get_local_icon_path()
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         # --- Главная страница и логика ---
         self.page_main = MainPageWidget()
         self.main_page_logic = MainPageLogic(self.page_main)
