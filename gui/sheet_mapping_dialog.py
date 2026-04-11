@@ -159,20 +159,8 @@ class SheetMappingDialog(QDialog):
         for file_path in self._file_order:
             source_sheets = list(self.file_to_sheets.get(file_path, []))
             file_mapping = {}
-            prefilled = self.auto_map.get(file_path, {})
 
-            # Fallbacks keep previous behavior: each target sheet gets a source.
-            for target_sheet in self.main_sheets:
-                if target_sheet in prefilled and prefilled[target_sheet] in source_sheets:
-                    file_mapping[target_sheet] = prefilled[target_sheet]
-                elif target_sheet in source_sheets:
-                    file_mapping[target_sheet] = target_sheet
-                elif source_sheets:
-                    file_mapping[target_sheet] = source_sheets[0]
-                else:
-                    file_mapping[target_sheet] = ""
-
-            # Explicit UI selections override fallbacks.
+            # Save only explicit/visible selections from UI.
             for source_sheet in source_sheets:
                 combo = self.comboboxes.get((file_path, source_sheet))
                 if combo is None:

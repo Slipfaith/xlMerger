@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal
 from utils.i18n import tr, i18n
 
 from core.drag_drop import DragDropLineEdit
-from .style_system import set_button_variant
+from .style_system import set_button_variant, set_label_state
 
 class MainPageWidget(QWidget):
     # Сигналы для FileProcessorApp
@@ -34,6 +34,7 @@ class MainPageWidget(QWidget):
         layout.addWidget(self.create_skip_first_row_checkbox())
         layout.addLayout(self.create_copy_method_selection_layout())
         layout.addWidget(self.create_preview_button(), alignment=Qt.AlignRight)
+        layout.addWidget(self.create_copy_column_status_label(), alignment=Qt.AlignCenter)
         layout.addWidget(self.create_process_button(), alignment=Qt.AlignCenter)
         self.setLayout(layout)
 
@@ -92,7 +93,9 @@ class MainPageWidget(QWidget):
     def create_copy_column_layout(self):
         layout = QHBoxLayout()
         self.copy_column_entry = QLineEdit(self)
-        self.copy_column_entry.setMaximumWidth(100)
+        self.copy_column_entry.setMinimumWidth(200)
+        self.copy_column_entry.setMaximumWidth(240)
+        self.copy_column_entry.setPlaceholderText(tr("Например, A (обязательно)"))
         self.copy_column_label = QLabel()
         self.copy_column_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(self.copy_column_label)
@@ -128,6 +131,14 @@ class MainPageWidget(QWidget):
         self.preview_button.clicked.connect(self.previewTriggered)
         return self.preview_button
 
+    def create_copy_column_status_label(self):
+        self.copy_column_status_label = QLabel(self)
+        self.copy_column_status_label.setAlignment(Qt.AlignCenter)
+        self.copy_column_status_label.setWordWrap(True)
+        set_label_state(self.copy_column_status_label, "error")
+        self.copy_column_status_label.setHidden(True)
+        return self.copy_column_status_label
+
     def create_process_button(self):
         self.process_button = QPushButton(tr("Начать"), self)
         self.process_button.setEnabled(False)
@@ -147,9 +158,11 @@ class MainPageWidget(QWidget):
     def retranslate_ui(self):
         self.folder_entry.setPlaceholderText(tr("Перетащи или кликни дважды"))
         self.excel_file_entry.setPlaceholderText(tr("Перетащи или кликни дважды"))
+        self.copy_column_entry.setPlaceholderText(tr("Например, A (обязательно)"))
         self.folder_label.setText(tr("Папка/эксели с переводами:"))
         self.excel_label.setText(tr("Целевой Excel:"))
         self.copy_column_label.setText(tr("Из какой колонки копировать? (буква колонки):"))
+        self.copy_column_status_label.setText(tr("не выбрана колонка с переводом."))
         self.skip_first_row_checkbox.setText(tr("Первая строка — заголовок в переводах"))
         self.copy_by_matching_radio.setText(tr("Нет пустых/скрытых строк в xlsx"))
         self.copy_by_row_number_radio.setText(tr("Есть пустые/скрытые строки в xlsx"))

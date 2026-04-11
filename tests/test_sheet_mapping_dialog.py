@@ -37,6 +37,5 @@ def test_sheet_mapping_dialog_fallback_uses_first_source_when_no_selection():
     dialog.comboboxes[(file_path, "OnlySource")].setCurrentText("")
     mapping = dialog.get_mapping()
 
-    assert mapping[file_path]["TargetA"] == "OnlySource"
-    assert mapping[file_path]["TargetB"] == "OnlySource"
+    assert mapping[file_path] == {}
     dialog.close()

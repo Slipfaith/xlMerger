@@ -276,20 +276,53 @@ class FileProcessorApp(QWidget):
             self.file_to_sheet_map = {f: {ms: ms for ms in main_sheets} for f in files}
             return True
 
-        auto_map = {}
-        for f, sheets in file_to_sheets.items():
-            auto_map[f] = {}
-            for ms in main_sheets:
-                if ms in sheets:
-                    auto_map[f][ms] = ms
-                elif len(sheets) == 1:
-                    auto_map[f][ms] = sheets[0]
+        auto_map = self._build_auto_sheet_mapping(main_sheets, file_to_sheets)
+        missing_auto = self._find_missing_sheet_mappings(main_sheets, files, auto_map)
+        if not missing_auto:
+            # Auto-map is complete; no need to bother user with the dialog.
+            self.file_to_sheet_map = auto_map
+            return True
 
         dialog = SheetMappingDialog(main_sheets, file_to_sheets, auto_map, self)
         if dialog.exec():
-            self.file_to_sheet_map = dialog.get_mapping()
+            mapping = dialog.get_mapping()
+            missing_manual = self._find_missing_sheet_mappings(main_sheets, files, mapping)
+            if missing_manual:
+                details = "\n".join(
+                    f"{os.path.basename(file_path)}: {', '.join(sheets)}"
+                    for file_path, sheets in missing_manual.items()
+                )
+                QMessageBox.warning(
+                    self,
+                    tr("Error"),
+                    tr("Не заданы соответствия листов для:\n{details}").format(details=details),
+                )
+                return False
+            self.file_to_sheet_map = mapping
             return True
         return False
+
+    @staticmethod
+    def _build_auto_sheet_mapping(main_sheets, file_to_sheets):
+        auto_map = {}
+        for file_path, sheets in file_to_sheets.items():
+            auto_map[file_path] = {}
+            for main_sheet in main_sheets:
+                if main_sheet in sheets:
+                    auto_map[file_path][main_sheet] = main_sheet
+                elif len(sheets) == 1:
+                    auto_map[file_path][main_sheet] = sheets[0]
+        return auto_map
+
+    @staticmethod
+    def _find_missing_sheet_mappings(main_sheets, files, mapping):
+        missing = {}
+        for file_path in files:
+            file_mapping = mapping.get(file_path, {})
+            missing_sheets = [sheet for sheet in main_sheets if not file_mapping.get(sheet)]
+            if missing_sheets:
+                missing[file_path] = missing_sheets
+        return missing
 
     # === Копирование ===
     def start_copying(self):

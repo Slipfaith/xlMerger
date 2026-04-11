@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QObject, Signal
 from core.excel_processor import ExcelProcessor
 from gui.excel_previewer import ExcelPreviewer
 from gui.excel_file_selector import ExcelFileSelector
+from utils.i18n import tr
 
 class MainPageLogic(QObject):
     proceed_to_next = Signal()  # Сигнал для перехода на следующий шаг
@@ -133,6 +134,9 @@ class MainPageLogic(QObject):
         can_start = bool(source_files) and bool(copy_column) and target_ok
         if hasattr(self.ui, "process_button"):
             self.ui.process_button.setEnabled(can_start)
+        if hasattr(self.ui, "copy_column_status_label"):
+            self.ui.copy_column_status_label.setText(tr("не выбрана колонка с переводом."))
+            self.ui.copy_column_status_label.setHidden(bool(copy_column))
 
     def _collect_source_files(self):
         if self.selected_files:

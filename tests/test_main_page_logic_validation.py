@@ -62,7 +62,7 @@ class DummyUI(QWidget):
         self.copy_column_entry = DummyEntry()
         self.sheet_list = DummySheetList()
 
-def test_main_page_logic_validation(qapp, monkeypatch, tmp_path):
+def test_main_page_logic_validation(qapp, monkeypatch):
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: QMessageBox.Ok)
     monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: QMessageBox.Ok)
 
@@ -73,15 +73,13 @@ def test_main_page_logic_validation(qapp, monkeypatch, tmp_path):
     assert not logic.validate_inputs()
 
     # Валидные значения: папка существует, файл существует и лист с нужным именем
-    folder = tmp_path
-    file_path = tmp_path / "file.xlsx"
-    # Для проверки нам достаточно существования файла. Создаём пустой
-    # файл вместо использования ``openpyxl``.
-    with open(file_path, "wb"):
-        pass
+    folder = r"C:\fake\translations"
+    file_path = r"C:\fake\target.xlsx"
+    monkeypatch.setattr("core.main_page_logic.os.path.isdir", lambda path: path == folder)
+    monkeypatch.setattr("core.main_page_logic.os.path.isfile", lambda path: path == file_path)
 
-    ui.folder_entry.setText(str(folder))
-    ui.excel_file_entry.setText(str(file_path))
+    ui.folder_entry.setText(folder)
+    ui.excel_file_entry.setText(file_path)
     ui.copy_column_entry.setText("A")
     ui.sheet_list = DummySheetList(count=1, checked=True, names=["Sheet1"])
 
