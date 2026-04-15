@@ -7,6 +7,7 @@ from openpyxl.styles import PatternFill
 from copy import copy as copy_style
 
 from utils.logger import Logger
+from utils.xlsxwriter_export import save_openpyxl_workbook_with_xlsxwriter
 
 class ExcelProcessor:
     def __init__(
@@ -116,7 +117,7 @@ class ExcelProcessor:
 
         base, ext = os.path.splitext(self.main_excel_path)
         output_file = f"{base}_out{ext}"
-        self.workbook.save(output_file)
+        save_openpyxl_workbook_with_xlsxwriter(self.workbook, output_file)
         self.logger.log_info(f"Файл успешно сохранён: {output_file}")
         self.logger.save()
         self.workbook.close()

@@ -15,6 +15,7 @@ from core.drag_drop import DragDropLineEdit
 from core.limit_auto import check_limits_auto
 from core.limit_manual import check_limits_manual
 from utils.i18n import tr
+from utils.xlsxwriter_export import save_openpyxl_workbook_with_xlsxwriter
 from .style_system import set_button_variant
 
 def _get_int_value(value):
@@ -455,7 +456,7 @@ class LimitsChecker(QWidget):
         base, ext = os.path.splitext(self.selected_file)
         output_file = f"{base}_checked{ext}"
         try:
-            self.workbook.save(output_file)
+            save_openpyxl_workbook_with_xlsxwriter(self.workbook, output_file)
         except Exception as e:
             QMessageBox.critical(self, tr("Ошибка"), tr("Не удалось сохранить файл: {e}").format(e=e))
             return

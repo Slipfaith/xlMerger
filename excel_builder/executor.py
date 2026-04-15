@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string
 
 from utils.logger import logger
+from utils.xlsxwriter_export import save_openpyxl_workbook_with_xlsxwriter
 
 LogFn = Callable[[str], None]
 
@@ -86,7 +87,10 @@ class ExcelBuilderExecutor:
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         if dest_path.lower().endswith(".xls"):
             dest_path = dest_path + "x"
-        workbook.save(dest_path)
+        try:
+            save_openpyxl_workbook_with_xlsxwriter(workbook, dest_path)
+        finally:
+            workbook.close()
 
     # region operation handling
     def _apply_operations(self, sheets: Dict[str, pd.DataFrame], operations: List[Dict], file_path: str):

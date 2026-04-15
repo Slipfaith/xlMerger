@@ -107,7 +107,7 @@ class SplitTab(QWidget):
             cfg = {
                 sheet: (
                     src,
-                    targets if targets else None,
+                    targets,
                     extras,
                 )
                 for sheet, (src, targets, extras) in self.sheet_mappings.items()

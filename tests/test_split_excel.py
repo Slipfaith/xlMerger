@@ -91,6 +91,43 @@ def test_split_excel_with_targets(tmp_path):
     assert out_de.is_file()
     assert not out_en.exists()
 
+
+def test_split_excel_with_only_source_and_extras_creates_single_file(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(["A", "B", "C", "D", "X"])
+    ws.append(["a1", "b1", "c1", "d1", "x1"])
+    ws.append(["a2", "b2", "c2", "d2", "x2"])
+    wb.save(src)
+    wb.close()
+
+    created = split_excel_by_languages(
+        str(src),
+        "Sheet1",
+        "D",
+        target_langs=[],
+        extra_columns=["A", "B", "X"],
+    )
+
+    assert created == [str(tmp_path / "main_D.xlsx")]
+    out_file = tmp_path / "main_D.xlsx"
+    assert out_file.is_file()
+
+    wb_out = load_workbook(out_file)
+    ws_out = wb_out.active
+    assert ws_out.max_column == 4
+    assert ws_out.cell(row=1, column=1).value == "A"
+    assert ws_out.cell(row=1, column=2).value == "B"
+    assert ws_out.cell(row=1, column=3).value == "X"
+    assert ws_out.cell(row=1, column=4).value == "D"
+    assert ws_out.cell(row=2, column=1).value == "a1"
+    assert ws_out.cell(row=2, column=2).value == "b1"
+    assert ws_out.cell(row=2, column=3).value == "x1"
+    assert ws_out.cell(row=2, column=4).value == "d1"
+    wb_out.close()
+
 def test_split_excel_with_non_language_target(tmp_path):
     src = tmp_path / "main.xlsx"
     wb = Workbook()
@@ -135,6 +172,40 @@ def test_split_excel_multiple_sheets(tmp_path):
     assert out_file.is_file()
     out_wb = load_workbook(out_file)
     assert set(out_wb.sheetnames) == {"S1", "S2"}
+    out_wb.close()
+
+
+def test_split_excel_multiple_sheets_source_only_creates_single_workbook(tmp_path):
+    src = tmp_path / "main.xlsx"
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "S1"
+    ws1.append(["A", "D", "X"])
+    ws1.append(["a1", "d1", "x1"])
+    ws2 = wb.create_sheet("S2")
+    ws2.append(["A", "D", "X"])
+    ws2.append(["a2", "d2", "x2"])
+    wb.save(src)
+    wb.close()
+
+    cfg = {
+        "S1": ("D", [], ["A", "X"]),
+        "S2": ("D", [], ["A", "X"]),
+    }
+
+    created = split_excel_multiple_sheets(str(src), cfg)
+    assert created == [str(tmp_path / "main_D.xlsx")]
+
+    out_file = tmp_path / "main_D.xlsx"
+    out_wb = load_workbook(out_file)
+    assert set(out_wb.sheetnames) == {"S1", "S2"}
+    s1 = out_wb["S1"]
+    assert s1.cell(row=1, column=1).value == "A"
+    assert s1.cell(row=1, column=2).value == "X"
+    assert s1.cell(row=1, column=3).value == "D"
+    assert s1.cell(row=2, column=1).value == "a1"
+    assert s1.cell(row=2, column=2).value == "x1"
+    assert s1.cell(row=2, column=3).value == "d1"
     out_wb.close()
 
 def test_split_preserves_format(tmp_path):

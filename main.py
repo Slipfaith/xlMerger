@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import ctypes
+import warnings
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
@@ -8,6 +9,13 @@ from gui.main_window import MainWindow
 from gui.style_system import apply_app_style
 
 ICON_PATH = Path(__file__).resolve().parent / "xlM2.0.ico"
+
+warnings.filterwarnings(
+    "ignore",
+    message="Workbook contains no default style, apply openpyxl's default",
+    category=UserWarning,
+    module="openpyxl.styles.stylesheet",
+)
 
 
 def _set_windows_app_id():

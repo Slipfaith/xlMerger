@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, PatternFill
 
 from core.excel_processor import ExcelProcessor
 
@@ -132,3 +132,44 @@ def test_get_data_max_row_ignores_style_only_rows(tmp_path):
     ws = wb.active
     assert ExcelProcessor._get_data_max_row(ws) == 0
     wb.close()
+
+
+def test_copy_data_preserve_formatting_keeps_source_cell_style(tmp_path):
+    main = tmp_path / "main_fmt.xlsx"
+    src = tmp_path / "src_fmt.xlsx"
+    _create_main_book(main)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(["SRC"])
+    ws.append(["v1"])
+    ws["A2"].font = Font(bold=True, color="FF00AA00")
+    ws["A2"].fill = PatternFill(fill_type="solid", fgColor="FFCCFFCC")
+    wb.save(src)
+    wb.close()
+
+    processor = ExcelProcessor(
+        main_excel_path=str(main),
+        folder_path="",
+        copy_column="A",
+        selected_sheets=["Sheet1"],
+        sheet_to_header_row={"Sheet1": 0},
+        sheet_to_column={"Sheet1": "A"},
+        file_to_column={str(src): "Target"},
+        folder_to_column={},
+        file_to_sheet_map={},
+        skip_first_row=True,
+        copy_by_row_number=False,
+        preserve_formatting=True,
+        logger=_DummyLogger(),
+    )
+
+    output = processor.copy_data()
+    wb_out = load_workbook(output)
+    ws_out = wb_out["Sheet1"]
+    assert ws_out["B2"].value == "v1"
+    assert ws_out["B2"].font.bold is True
+    assert ws_out["B2"].fill.fgColor.rgb is not None
+    assert ws_out["B2"].fill.fgColor.rgb.upper().endswith("CCFFCC")
+    wb_out.close()

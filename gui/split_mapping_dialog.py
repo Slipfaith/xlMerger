@@ -131,11 +131,13 @@ class SplitMappingDialog(QDialog):
             self.apply_all_checkbox.toggled.connect(self._toggle_apply_all)
             layout.addWidget(self.apply_all_checkbox)
 
-        info = QLabel(
+        self.info_label = QLabel(
             tr("Выбери исходный столбец (синий) и столбцы перевода (зелёный).")
+            + "\n"
+            + "Левой кнопкой мыши - выделить, правой кнопкой мыши - отменить выделение."
         )
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        self.info_label.setWordWrap(True)
+        layout.addWidget(self.info_label)
 
         self.table = QTableView()
         self.table.setModel(self.model)
